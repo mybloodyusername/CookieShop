@@ -1,26 +1,28 @@
-namespace CookieShop.Api;
 
-public class Program
-{
-    public static void Main(string[] args)
-    {
-        var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-        // Add services to the container.
+builder.Logging.ClearProviders().AddConsole();
+builder.Services.AddLogging(options => options.SetMinimumLevel(LogLevel.Trace).AddConsole());
 
-        builder.Services.AddControllers();
+// Add services to the container.
 
-        var app = builder.Build();
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddOpenApi();
 
-        // Configure the HTTP request pipeline.
-
-        app.UseHttpsRedirection();
-
-        app.UseAuthorization();
+// builder.Services.AddCookieShopDbContext();
 
 
-        app.MapControllers();
+var app = builder.Build();
 
-        app.Run();
-    }
-}
+// Configure the HTTP request pipeline.
+
+app.UseHttpsRedirection();
+
+app.UseAuthorization();
+
+
+app.MapControllers();
+
+
+app.Run();

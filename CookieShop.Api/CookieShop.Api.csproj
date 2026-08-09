@@ -23,4 +23,10 @@
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\CookieShop.Domain\CookieShop.App.csproj" />
+        <ProjectReference Include="..\CookieShop.Domain\CookieShop.Domain.csproj" />
+        <ProjectReference Include="..\CookieShop.Domain\CookieShop.Infra.csproj" />
+    </ItemGroup>
+
 </Project>
