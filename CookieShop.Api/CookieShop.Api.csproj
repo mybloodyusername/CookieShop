@@ -24,9 +24,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\CookieShop.Domain\CookieShop.App.csproj" />
+        <ProjectReference Include="..\CookieShop.App\CookieShop.App.csproj" />
         <ProjectReference Include="..\CookieShop.Domain\CookieShop.Domain.csproj" />
-        <ProjectReference Include="..\CookieShop.Domain\CookieShop.Infra.csproj" />
+        <ProjectReference Include="..\CookieShop.Infra\CookieShop.Infra.csproj" />
     </ItemGroup>
 
 </Project>
