@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CookieShop.Api", "CookieShop.Api\CookieShop.Api.csproj", "{690845E0-CAC9-4282-90B3-8DDB6ADB556B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CookieShop.App", "CookieShop.App\CookieShop.App.csproj", "{195650DC-4A30-47CB-9651-EDA0C037293C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CookieShop.Domain", "CookieShop.Domain\CookieShop.Domain.csproj", "{C035B15C-9FB4-4B0D-BE40-64980B0F92F9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CookieShop.Infra", "CookieShop.Infra\CookieShop.Infra.csproj", "{C958CD97-9A24-4A1D-9373-714C558F7867}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{690845E0-CAC9-4282-90B3-8DDB6ADB556B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{690845E0-CAC9-4282-90B3-8DDB6ADB556B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{690845E0-CAC9-4282-90B3-8DDB6ADB556B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{690845E0-CAC9-4282-90B3-8DDB6ADB556B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{195650DC-4A30-47CB-9651-EDA0C037293C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{195650DC-4A30-47CB-9651-EDA0C037293C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{195650DC-4A30-47CB-9651-EDA0C037293C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{195650DC-4A30-47CB-9651-EDA0C037293C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C035B15C-9FB4-4B0D-BE40-64980B0F92F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C035B15C-9FB4-4B0D-BE40-64980B0F92F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C035B15C-9FB4-4B0D-BE40-64980B0F92F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C035B15C-9FB4-4B0D-BE40-64980B0F92F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C958CD97-9A24-4A1D-9373-714C558F7867}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C958CD97-9A24-4A1D-9373-714C558F7867}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C958CD97-9A24-4A1D-9373-714C558F7867}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C958CD97-9A24-4A1D-9373-714C558F7867}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
