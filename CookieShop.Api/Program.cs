@@ -1,5 +1,8 @@
 using CookieShop.Api.Exceptions;
+using CookieShop.App.Interfaces.Repositories;
+using CookieShop.App.Services;
 using CookieShop.Infra.Extensions;
+using CookieShop.Infra.Repositories;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +24,11 @@ builder.Services.AddCorsPolicies(builder.Configuration);
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+
+builder.Services.AddScoped<UserService>();
 
 
 var app = builder.Build();

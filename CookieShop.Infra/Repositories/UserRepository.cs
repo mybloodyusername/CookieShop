@@ -2,10 +2,8 @@ using System.ComponentModel.DataAnnotations;
 using CookieShop.App.DTOs.User;
 using CookieShop.App.Exceptions;
 using CookieShop.App.Interfaces.Repositories;
-using CookieShop.Domain.Constants;
 using CookieShop.Domain.Entities;
 using CookieShop.Infra.Data;
-using Mapster;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,17 +13,17 @@ public class UserRepository(
     CookieShopDbContext context,
     UserManager<ApplicationUser> userManager) : IUserRepository
 {
-    public async Task<ApplicationUser?> GetUserByIdAsync(string userId)
+    public async Task<ApplicationUser?> GetById(string userId)
     {
         return await userManager.FindByIdAsync(userId);
     }
 
-    public async Task<ApplicationUser?> GetUserByPhoneNumber(string phoneNumber)
+    public async Task<ApplicationUser?> GetByPhoneNumber(string phoneNumber)
     {
         return await context.Users.FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber);
     }
 
-    public async Task<ApplicationUser> CreateUser(CreateUserRequest request)
+    public async Task<ApplicationUser> Create(CreateUserRequest request)
     {
         var existingUserByEmail = await userManager.FindByEmailAsync(request.Email);
         if (existingUserByEmail != null) throw new DuplicateException("Email already exists.");
@@ -51,15 +49,7 @@ public class UserRepository(
         throw new ValidationException(errors);
     }
 
-    public async Task<string> AssignRole(ApplicationUser applicationUser, string userRole)
-    {
-        var roleResult = await userManager.AddToRoleAsync(applicationUser, userRole);
-        if (roleResult.Succeeded) return userRole;
-        var errors = string.Join("; ", roleResult.Errors.Select(e => e.Description));
-        throw new ValidationException(errors);
-    }
-
-    public async Task<ApplicationUser> UpdateUser(UpdateUserRequest request)
+    public async Task<ApplicationUser> Update(UpdateUserRequest request)
     {
         var existingUser = await userManager.FindByIdAsync(request.Id);
         if (existingUser == null) throw new NotFoundException("User not found.");
@@ -73,6 +63,14 @@ public class UserRepository(
         var result = await userManager.UpdateAsync(existingUser);
         if (result.Succeeded) return existingUser;
         var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+        throw new ValidationException(errors);
+    }
+
+    public async Task<string> AssignRole(ApplicationUser applicationUser, string userRole)
+    {
+        var roleResult = await userManager.AddToRoleAsync(applicationUser, userRole);
+        if (roleResult.Succeeded) return userRole;
+        var errors = string.Join("; ", roleResult.Errors.Select(e => e.Description));
         throw new ValidationException(errors);
     }
 }

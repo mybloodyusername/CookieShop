@@ -5,9 +5,9 @@ namespace CookieShop.App.Interfaces.Repositories;
 
 public interface IUserRepository
 {
-    public Task<ApplicationUser?> GetUserByIdAsync(string userId);
-    public Task<ApplicationUser?> GetUserByPhoneNumber(string username);
-    public Task<ApplicationUser> CreateUser(CreateUserRequest request);
-    public Task<ApplicationUser> UpdateUser(UpdateUserRequest request);
+    public Task<ApplicationUser?> GetById(string userId);
+    public Task<ApplicationUser?> GetByPhoneNumber(string username);
+    public Task<ApplicationUser> Create(CreateUserRequest request);
+    public Task<ApplicationUser> Update(UpdateUserRequest request);
     public Task<string> AssignRole(ApplicationUser applicationUser, string userRole);
 }
