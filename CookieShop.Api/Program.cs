@@ -1,5 +1,4 @@
-
-using CookieShop.Domain.Exceptions;
+using CookieShop.Api.Exceptions;
 using CookieShop.Infra.Extensions;
 using Scalar.AspNetCore;
 

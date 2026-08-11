@@ -20,8 +20,11 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Contracts\" />
-      <Folder Include="Services\" />
+      <ProjectReference Include="..\CookieShop.Domain\CookieShop.Domain.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Interfaces\Contracts\" />
     </ItemGroup>
 
 </Project>

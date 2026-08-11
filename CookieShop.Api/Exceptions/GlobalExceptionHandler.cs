@@ -1,9 +1,7 @@
 using System.Security.Authentication;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 
-namespace CookieShop.Domain.Exceptions;
+namespace CookieShop.Api.Exceptions;
 
 public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {

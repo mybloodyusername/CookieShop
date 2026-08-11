@@ -25,10 +25,10 @@
       <Folder Include="Configurations\" />
       <Folder Include="Data\" />
       <Folder Include="Extensions\" />
-      <Folder Include="Repositories\" />
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\CookieShop.App\CookieShop.App.csproj" />
       <ProjectReference Include="..\CookieShop.Domain\CookieShop.Domain.csproj" />
     </ItemGroup>
 
