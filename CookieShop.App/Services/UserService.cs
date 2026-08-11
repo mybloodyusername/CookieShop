@@ -29,8 +29,10 @@ public class UserService(IUserRepository userRepository)
             : throw new ConflictException("Role cannot be assigned");
     }
 
-    public async Task<UserResponse> Update(UpdateUserRequest request)
+    public async Task<UserResponse> Update(string? userId, UpdateUserRequest request)
     {
+        if (userId == null) throw new UnauthorizedAccessException("User id not found");
+        if (userId != request.Id) throw new UnauthorizedAccessException("User id does not match");
         var user = await userRepository.Update(request);
         return user.Adapt<UserResponse>();
     }

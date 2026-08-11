@@ -1,18 +1,29 @@
+using System.Security.Claims;
 using CookieShop.App.DTOs.User;
 using CookieShop.App.Services;
+using CookieShop.Domain.Constants;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CookieShop.Api.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/[controller]/[action]")]
+    [Authorize(Roles = UserRole.Customer)]
     [ApiController]
     public class UserController(UserService userService) : ControllerBase
     {
-        [HttpPost("[action]")]
-        public async Task<ActionResult<UserResponse>> Create([FromBody] CreateUserRequest request)
+        [HttpPost]
+        public async Task<ActionResult<UserResponse>> Update([FromBody] UpdateUserRequest request)
         {
-            var result = await userService.Create(request);
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var result = await userService.Update(userId, request);
             return Ok(result);
+        }
+
+        [HttpPost]
+        public Task<ActionResult> ChangePassword()
+        {
+            throw new NotImplementedException();
         }
     }
 }

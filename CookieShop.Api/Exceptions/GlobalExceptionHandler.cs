@@ -25,10 +25,8 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
         httpContext.Response.StatusCode = statusCode;
 
         await Results.Problem(
-                statusCode: statusCode,
-                title: statusCode == 500
-                    ? "An unexpected error occurred."
-                    : exception.Message)
+                detail: statusCode == 500 ? "An unexpected error occurred." : exception.Message,
+                statusCode: statusCode)
             .ExecuteAsync(httpContext);
 
         return true;
