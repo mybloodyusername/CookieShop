@@ -9,9 +9,7 @@ public record UpdateUserRequest
 
     [MaxLength(64)] public string LastName { get; set; } = string.Empty;
 
-    [Required] [EmailAddress] public required string Email { get; set; }
+    [Required, EmailAddress] public required string Email { get; set; }
 
-    [Required]
-    [RegularExpression(@"^(\\+98|0)?9\\d{9}$")]
-    public required string PhoneNumber { get; set; }
+    [Required] public required string PhoneNumber { get; set; }
 }

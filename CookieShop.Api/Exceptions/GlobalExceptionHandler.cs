@@ -1,4 +1,6 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Authentication;
+using CookieShop.App.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 
 namespace CookieShop.Api.Exceptions;
@@ -15,8 +17,8 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
         var statusCode = exception switch
         {
             UnauthorizedAccessException or InvalidCredentialException => StatusCodes.Status401Unauthorized,
-            // NotFoundException => StatusCodes.Status404NotFound,
-            // ValidationException or ConflictException => StatusCodes.Status400BadRequest,
+            NotFoundException => StatusCodes.Status404NotFound,
+            ValidationException or ConflictException or DuplicateException => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError
         };
 
