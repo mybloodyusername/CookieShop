@@ -25,10 +25,10 @@ builder.Services.AddCorsPolicies(builder.Configuration);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<AuthService>();
 
 
 var app = builder.Build();
@@ -46,11 +46,9 @@ else
     app.UseCors("ProductionPolicy");
 }
 
-// Configure the HTTP request pipeline.
 
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
-
 app.UseAuthentication();
 app.UseAuthorization();
 

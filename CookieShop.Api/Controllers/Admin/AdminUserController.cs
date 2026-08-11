@@ -4,10 +4,10 @@ using CookieShop.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace CookieShop.Api.Controllers
+namespace CookieShop.Api.Controllers.Admin
 {
-    [Route("api/Admin/[controller]/[action]")]
     [Authorize(Roles = UserRole.Admin)]
+    [Route("api/Admin/User/[action]")]
     [ApiController]
     public class AdminUserController(UserService userService) : ControllerBase
     {

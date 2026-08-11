@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CookieShop.Api.Controllers
 {
-    [Route("api/[controller]/[action]")]
     [Authorize(Roles = UserRole.Customer)]
+    [Route("api/[controller]/[action]")]
     [ApiController]
     public class UserController(UserService userService) : ControllerBase
     {
