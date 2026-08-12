@@ -18,24 +18,24 @@ namespace CookieShop.Api.Controllers.Admin
             return Ok(result);
         }
 
-        [HttpPost("{userId}")]
-        public async Task<ActionResult<UserResponse>> Update(string userId, [FromBody] UpdateUserRequest request)
+        [HttpPost("{id}")]
+        public async Task<ActionResult<UserResponse>> Update(string id, [FromBody] UpdateUserRequest request)
         {
-            var result = await userService.Update(userId, request);
+            var result = await userService.Update(id, request);
             return Ok(result);
         }
 
-        [HttpGet("{userId}")]
-        public async Task<ActionResult<UserResponse>> GetById(string userId)
+        [HttpGet("{id}")]
+        public async Task<ActionResult<UserResponse>> GetById(string id)
         {
-            var result = await userService.GetById(userId);
+            var result = await userService.GetById(id);
             return Ok(result);
         }
         
-        [HttpGet("{userPhoneNumber}")]
-        public async Task<ActionResult<UserResponse>> GetByPhoneNumber(string userPhoneNumber)
+        [HttpGet("{phoneNumber}")]
+        public async Task<ActionResult<UserResponse>> GetByPhoneNumber(string phoneNumber)
         {
-            var result = await userService.GetByPhoneNumber(userPhoneNumber);
+            var result = await userService.GetByPhoneNumber(phoneNumber);
             return Ok(result);
         }
 
