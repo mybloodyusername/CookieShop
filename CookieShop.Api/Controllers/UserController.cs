@@ -25,5 +25,13 @@ namespace CookieShop.Api.Controllers
         {
             throw new NotImplementedException();
         }
+        
+        [HttpGet]
+        public async Task<ActionResult<UserResponse>> Me()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var result = await userService.Me(userId);
+            return Ok(result);
+        }
     }
 }

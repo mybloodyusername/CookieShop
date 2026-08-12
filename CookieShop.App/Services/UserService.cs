@@ -36,4 +36,11 @@ public class UserService(IUserRepository userRepository)
         var user = await userRepository.Update(request);
         return user.Adapt<UserResponse>();
     }
+
+    public async Task<UserResponse> Me(string? id)
+    {
+        if (id == null) throw new UnauthorizedAccessException("User id not found");
+        var result = await userRepository.GetById(id);
+        return result == null ? throw new NotFoundException("User not found") : result.Adapt<UserResponse>();
+    }
 }

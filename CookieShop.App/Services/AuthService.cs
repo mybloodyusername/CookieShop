@@ -40,7 +40,7 @@ public class AuthService(
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Lax,
-            Secure = false, // set to true in production with HTTPS
+            Secure = context.Request.IsHttps,
             Expires = DateTimeOffset.UtcNow.AddDays(expirationDays)
         });
 
