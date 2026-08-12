@@ -15,18 +15,16 @@ builder.Services.AddLogging(options => options.SetMinimumLevel(LogLevel.Trace).A
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
-
-builder.Services.AddCookieShopDbContext(builder.Configuration);
-builder.Services.AddIdentityDbContext(builder.Configuration);
-builder.Services.AddCookieSetting(builder.Configuration);
-builder.Services.AddJwtAuthentication(builder.Configuration);
-builder.Services.AddCorsPolicies(builder.Configuration);
-
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddCookieShopDbContext(builder.Configuration);
+builder.Services.AddIdentityDbContext(builder.Configuration);
+builder.Services.AddJwtAuthentication(builder.Configuration);
+builder.Services.AddCorsPolicies(builder.Configuration);
 
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AuthService>();
 

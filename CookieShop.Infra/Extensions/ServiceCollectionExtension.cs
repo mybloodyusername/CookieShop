@@ -1,9 +1,7 @@
 using System.Text;
 using CookieShop.Domain.Entities;
 using CookieShop.Infra.Data;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -25,7 +23,7 @@ public static class ServiceCollectionExtension
 
         public void AddIdentityDbContext(IConfiguration configuration)
         {
-            services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
+            services.AddIdentityCore<ApplicationUser>(options =>
                 {
                     options.Password.RequireDigit = true;
                     options.Password.RequireLowercase = false;
@@ -34,45 +32,21 @@ public static class ServiceCollectionExtension
                     options.Password.RequiredLength = 6;
                     options.User.RequireUniqueEmail = false;
                 })
+                .AddRoles<IdentityRole<Guid>>()
                 .AddEntityFrameworkStores<CookieShopDbContext>()
+                .AddSignInManager()
                 .AddDefaultTokenProviders();
-        }
-
-        public void AddCookieSetting(IConfiguration configuration)
-        {
-            var jwtSettings = configuration.GetSection("JwtSettings");
-            var expirationDays = jwtSettings.GetSection("ExpirationDays").Get<int>();
-
-            services.ConfigureApplicationCookie(options =>
-            {
-                options.Cookie.Name = "CookieShop.Identity";
-                options.Cookie.HttpOnly = true;
-                options.Cookie.SameSite = SameSiteMode.Lax;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.None;
-                options.ExpireTimeSpan = TimeSpan.FromDays(expirationDays);
-
-                options.Events = new CookieAuthenticationEvents
-                {
-                    OnRedirectToLogin = ctx =>
-                    {
-                        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                        return Task.CompletedTask;
-                    },
-                    OnRedirectToAccessDenied = ctx =>
-                    {
-                        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
-                        return Task.CompletedTask;
-                    }
-                };
-            });
         }
 
         public void AddJwtAuthentication(IConfiguration configuration)
         {
             var jwtSettings = configuration.GetSection("JwtSettings");
 
-
-            services.AddAuthentication(options => { options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme; })
+            services.AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                })
                 .AddJwtBearer(options =>
                 {
                     options.TokenValidationParameters = new TokenValidationParameters
@@ -85,14 +59,14 @@ public static class ServiceCollectionExtension
                         ClockSkew = TimeSpan.Zero,
                         IssuerSigningKey =
                             new SymmetricSecurityKey(
-                                Encoding.UTF8.GetBytes(jwtSettings.GetSection("SecurityKey").Value!))
+                                Encoding.UTF8.GetBytes(jwtSettings.GetSection("SecretKey").Value!))
                     };
                     options.Events = new JwtBearerEvents
                     {
                         OnMessageReceived = context =>
                         {
                             // read token from HttpOnly cookie
-                            if (context.Request.Cookies.TryGetValue("CookieShop.Identity", out var token))
+                            if (context.Request.Cookies.TryGetValue("CookieShop.Token", out var token))
                                 context.Token = token;
                             return Task.CompletedTask;
                         }
@@ -102,9 +76,8 @@ public static class ServiceCollectionExtension
 
         public void AddCorsPolicies(IConfiguration configuration)
         {
-            
             var corsSettings = configuration.GetSection("CorsSettings");
-            
+
             services.AddCors(options =>
             {
                 options.AddPolicy("DevelopmentPolicy", policy =>
