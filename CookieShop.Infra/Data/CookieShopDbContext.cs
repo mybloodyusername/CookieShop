@@ -16,6 +16,7 @@ public class CookieShopDbContext(DbContextOptions<CookieShopDbContext> options)
     {
         base.OnModelCreating(builder);
         builder.ApplyConfiguration(new UserConfig());
+        builder.ApplyConfiguration(new AddressConfig());
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())
