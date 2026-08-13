@@ -53,17 +53,9 @@ public class CityService(ICityRepository cityRepository, ILogger<CityService> lo
         }
     }
 
-    public async Task<ICollection<CityResponse>> GetByProvinceId(Guid id)
+    public async Task<IReadOnlyCollection<CityResponse>> GetByProvinceId(Guid id)
     {
-        try
-        {
-            var result = await cityRepository.GetByProvinceId(id);
-            return result.Adapt<List<CityResponse>>();
-        }
-        catch (DbUpdateException e)
-        {
-            logger.LogError(e, "Failed to fetch cities.");
-            throw new ConflictException("Cities cannot be fetched. Make sure the province exists.");
-        }
+        var cities = await cityRepository.GetByProvinceId(id);
+        return cities.Adapt<List<CityResponse>>();
     }
 }

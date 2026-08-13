@@ -5,5 +5,5 @@ namespace CookieShop.App.DTOs.Province;
 public record ProvinceDetailResponse(
     Guid Id,
     string Name,
-    ICollection<CityResponse> Cities
+    IReadOnlyCollection<CityResponse> Cities
 );

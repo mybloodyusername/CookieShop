@@ -9,19 +9,11 @@ namespace CookieShop.App.Services;
 
 public class ProvinceService(IProvinceRepository provinceRepository, ILogger<ProvinceService> logger)
 {
-    public async Task<ProvinceDetailResponse?> GetById(Guid id)
+    public async Task<ProvinceDetailResponse> GetById(Guid id)
     {
-        try
-        {
-            var result = await provinceRepository.GetById(id);
-            if (result is null) throw new NotFoundException("Province not found.");
-            return result.Adapt<ProvinceDetailResponse>();
-        }
-        catch (DbUpdateException e)
-        {
-            logger.LogError(e, "Failed to fetch province.");
-            throw new ConflictException("Province cannot be fetched.");
-        }
+        var result = await provinceRepository.GetById(id);
+        if (result is null) throw new NotFoundException("Province not found.");
+        return result.Adapt<ProvinceDetailResponse>();
     }
 
     public async Task<ProvinceResponse> Create(CreateProvinceRequest request)
@@ -68,17 +60,9 @@ public class ProvinceService(IProvinceRepository provinceRepository, ILogger<Pro
         }
     }
 
-    public async Task<ICollection<ProvinceResponse>> GetAll()
+    public async Task<IReadOnlyCollection<ProvinceResponse>> GetAll()
     {
-        try
-        {
-            var provinces = await provinceRepository.GetAll();
-            return provinces.Adapt<List<ProvinceResponse>>();
-        }
-        catch (DbUpdateException e)
-        {
-            logger.LogError(e, "Failed to fetch provinces.");
-            throw new ConflictException("Provinces cannot be fetched.");
-        }
+        var provinces = await provinceRepository.GetAll();
+        return provinces.Adapt<List<ProvinceResponse>>();
     }
 }

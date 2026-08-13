@@ -11,12 +11,15 @@ public class CityRepository(CookieShopDbContext context) : ICityRepository
 {
     public async Task<City?> GetById(Guid id)
     {
-        return await context.Cities.FirstOrDefaultAsync(c => c.Id == id);
+        return await context.Cities.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
     }
 
-    public async Task<ICollection<City>> GetByProvinceId(Guid id)
+    public async Task<IReadOnlyCollection<City>> GetByProvinceId(Guid id)
     {
-        return await context.Cities.Where(c => c.ProvinceId == id).ToListAsync();
+        return await context.Cities
+            .Where(c => c.ProvinceId == id)
+            .AsNoTracking()
+            .ToListAsync();
     }
 
     public async Task<City> Create(CreateCityRequest request)

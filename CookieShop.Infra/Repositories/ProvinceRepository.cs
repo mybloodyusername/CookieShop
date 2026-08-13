@@ -13,12 +13,13 @@ public class ProvinceRepository(CookieShopDbContext context) : IProvinceReposito
     {
         return await context.Provinces
             .Include(p => p.Cities)
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
-    public async Task<ICollection<Province>> GetAll()
+    public async Task<IReadOnlyCollection<Province>> GetAll()
     {
-        return await context.Provinces.ToListAsync();
+        return await context.Provinces.AsNoTracking().ToListAsync();
     }
 
     public async Task<Province> Create(CreateProvinceRequest request)
