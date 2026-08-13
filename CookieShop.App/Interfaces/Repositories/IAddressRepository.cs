@@ -5,9 +5,9 @@ namespace CookieShop.App.Interfaces.Repositories;
 
 public interface IAddressRepository
 {
-    public Task<Address> GetById(string id);
-    public Task<Address> GetAllByUserId(string id);
+    public Task<Address> GetById(Guid id);
+    public Task<Address> GetAllByUserId(Guid id);
     public Task<Address> Create(CreateAddressRequest request);
     public Task<Address> Update(UpdateAddressRequest request);
-    public Task<Address> Delete(string id);
+    public Task<Address> Delete(Guid id);
 }

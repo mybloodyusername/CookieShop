@@ -23,7 +23,7 @@ public class CityRepository(CookieShopDbContext context) : ICityRepository
         throw new NotImplementedException();
     }
 
-    public Task<City> Delete(string id)
+    public Task<City> Delete(Guid id)
     {
         throw new NotImplementedException();
     }

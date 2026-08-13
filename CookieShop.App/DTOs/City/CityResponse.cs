@@ -1,7 +1,7 @@
 namespace CookieShop.App.DTOs.City;
 
 public record CityResponse(
-    string Id,
+    Guid Id,
     string Name,
     string ProvinceId
 );

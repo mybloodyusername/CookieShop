@@ -8,7 +8,7 @@ namespace CookieShop.App.Services;
 
 public class UserService(IUserRepository userRepository)
 {
-    public async Task<UserResponse> GetById(string id)
+    public async Task<UserResponse> GetById(Guid id)
     {
         var user = await userRepository.GetById(id);
         return user == null ? throw new NotFoundException("User not found") : user.Adapt<UserResponse>();
@@ -32,14 +32,14 @@ public class UserService(IUserRepository userRepository)
     public async Task<UserResponse> Update(Guid? id, UpdateUserRequest request)
     {
         if (id == null) throw new UnauthorizedAccessException("User id not found");
-        if (id.ToString() != request.Id) throw new UnauthorizedAccessException("User id does not match");
+        if (!id.Equals(request.Id)) throw new UnauthorizedAccessException("User id does not match");
         var user = await userRepository.Update(request);
         return user.Adapt<UserResponse>();
     }
 
     public async Task<UserResponse> Me(Guid id)
     {
-        var result = await userRepository.GetById(id.ToString());
+        var result = await userRepository.GetById(id);
         return result == null ? throw new NotFoundException("User not found") : result.Adapt<UserResponse>();
     }
 }

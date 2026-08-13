@@ -5,14 +5,15 @@ using CookieShop.App.DTOs.User;
 namespace CookieShop.App.DTOs.Address;
 
 public record AddressDetailResponse(
+    Guid Id,
     string Title,
     string AddressLine1,
     string AddressLine2,
     string PhoneNumber,
-    string UserId,
+    Guid UserId,
     UserResponse User,
-    string ProvinceId,
+    Guid ProvinceId,
     ProvinceResponse Province,
-    string CityId,
+    Guid CityId,
     CityResponse City
 );

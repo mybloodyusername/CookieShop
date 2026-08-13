@@ -6,7 +6,7 @@ namespace CookieShop.Infra.Repositories;
 
 public class ProvinceRepository : IProvinceRepository
 {
-    public Task<Province> GetById(string id)
+    public Task<Province> GetById(Guid id)
     {
         throw new NotImplementedException();
     }
@@ -21,7 +21,7 @@ public class ProvinceRepository : IProvinceRepository
         throw new NotImplementedException();
     }
 
-    public Task<Province> Delete(string id)
+    public Task<Province> Delete(Guid id)
     {
         throw new NotImplementedException();
     }

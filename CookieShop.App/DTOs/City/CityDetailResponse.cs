@@ -3,8 +3,8 @@ using CookieShop.App.DTOs.Province;
 namespace CookieShop.App.DTOs.City;
 
 public record CityDetailResponse(
-    string Id,
+    Guid Id,
     string Name,
     ProvinceResponse Province,
-    string ProvinceId
+    Guid ProvinceId
 );

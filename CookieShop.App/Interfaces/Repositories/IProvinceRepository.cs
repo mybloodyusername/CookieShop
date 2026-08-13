@@ -5,8 +5,8 @@ namespace CookieShop.App.Interfaces.Repositories;
 
 public interface IProvinceRepository
 {
-    public Task<Province> GetById(string id);
+    public Task<Province> GetById(Guid id);
     public Task<Province> Create(CreateProvinceRequest request);
     public Task<Province> Update(UpdateProvinceRequest request);
-    public Task<Province> Delete(string id);
+    public Task<Province> Delete(Guid id);
 }

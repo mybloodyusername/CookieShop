@@ -6,12 +6,12 @@ namespace CookieShop.Infra.Repositories;
 
 public class AddressRepository : IAddressRepository
 {
-    public Task<Address> GetById(string id)
+    public Task<Address> GetById(Guid id)
     {
         throw new NotImplementedException();
     }
 
-    public Task<Address> GetAllByUserId(string id)
+    public Task<Address> GetAllByUserId(Guid id)
     {
         throw new NotImplementedException();
     }
@@ -26,7 +26,7 @@ public class AddressRepository : IAddressRepository
         throw new NotImplementedException();
     }
 
-    public Task<Address> Delete(string id)
+    public Task<Address> Delete(Guid id)
     {
         throw new NotImplementedException();
     }

@@ -1,6 +1,6 @@
 namespace CookieShop.App.DTOs.Province;
 
 public record ProvinceResponse(
-    string Id,
+    Guid Id,
     string Name
 );

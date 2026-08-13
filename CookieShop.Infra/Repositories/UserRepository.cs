@@ -13,9 +13,9 @@ public class UserRepository(
     CookieShopDbContext context,
     UserManager<ApplicationUser> userManager) : IUserRepository
 {
-    public async Task<ApplicationUser?> GetById(string userId)
+    public async Task<ApplicationUser?> GetById(Guid userId)
     {
-        return await userManager.FindByIdAsync(userId);
+        return await userManager.FindByIdAsync(userId.ToString());
     }
 
     public async Task<ApplicationUser?> GetByPhoneNumber(string phoneNumber)
@@ -51,7 +51,7 @@ public class UserRepository(
 
     public async Task<ApplicationUser> Update(UpdateUserRequest request)
     {
-        var existingUser = await userManager.FindByIdAsync(request.Id);
+        var existingUser = await userManager.FindByIdAsync(request.Id.ToString());
         if (existingUser == null) throw new NotFoundException("User not found.");
 
         existingUser.PhoneNumber = request.PhoneNumber;

@@ -26,7 +26,7 @@ namespace CookieShop.Api.Controllers.Admin
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<UserResponse>> GetById(string id)
+        public async Task<ActionResult<UserResponse>> GetById(Guid id)
         {
             var result = await userService.GetById(id);
             return Ok(result);
