@@ -29,18 +29,17 @@ public class UserService(IUserRepository userRepository)
             : throw new ConflictException("Role cannot be assigned");
     }
 
-    public async Task<UserResponse> Update(string? id, UpdateUserRequest request)
+    public async Task<UserResponse> Update(Guid? id, UpdateUserRequest request)
     {
         if (id == null) throw new UnauthorizedAccessException("User id not found");
-        if (id != request.Id) throw new UnauthorizedAccessException("User id does not match");
+        if (id.ToString() != request.Id) throw new UnauthorizedAccessException("User id does not match");
         var user = await userRepository.Update(request);
         return user.Adapt<UserResponse>();
     }
 
-    public async Task<UserResponse> Me(string? id)
+    public async Task<UserResponse> Me(Guid id)
     {
-        if (id == null) throw new UnauthorizedAccessException("User id not found");
-        var result = await userRepository.GetById(id);
+        var result = await userRepository.GetById(id.ToString());
         return result == null ? throw new NotFoundException("User not found") : result.Adapt<UserResponse>();
     }
 }

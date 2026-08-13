@@ -19,7 +19,7 @@ namespace CookieShop.Api.Controllers.Admin
         }
 
         [HttpPost("{id}")]
-        public async Task<ActionResult<UserResponse>> Update(string id, [FromBody] UpdateUserRequest request)
+        public async Task<ActionResult<UserResponse>> Update(Guid id, [FromBody] UpdateUserRequest request)
         {
             var result = await userService.Update(id, request);
             return Ok(result);

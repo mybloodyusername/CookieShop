@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using CookieShop.App.DTOs.User;
+using CookieShop.App.Extensions;
 using CookieShop.App.Services;
 using CookieShop.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
@@ -15,7 +15,7 @@ namespace CookieShop.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<UserResponse>> Update([FromBody] UpdateUserRequest request)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             var result = await userService.Update(userId, request);
             return Ok(result);
         }
@@ -29,7 +29,7 @@ namespace CookieShop.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<UserResponse>> Me()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = User.GetUserId();
             var result = await userService.Me(userId);
             return Ok(result);
         }

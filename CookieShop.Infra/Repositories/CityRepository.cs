@@ -2,14 +2,15 @@ using CookieShop.App.DTOs.City;
 using CookieShop.App.Interfaces.Repositories;
 using CookieShop.Domain.Entities;
 using CookieShop.Infra.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace CookieShop.Infra.Repositories;
 
 public class CityRepository(CookieShopDbContext context) : ICityRepository
 {
-    public Task<City?> GetById(string id)
+    public async Task<City?> GetById(Guid id)
     {
-        throw new NotImplementedException();
+        return await context.Cities.FirstOrDefaultAsync(c => c.Id == id);
     }
 
     public Task<City> Create(CreateCityRequest request)
