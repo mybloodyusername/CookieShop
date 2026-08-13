@@ -65,7 +65,7 @@ namespace CookieShop.Infra.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Address");
+                    b.ToTable("Addresses");
                 });
 
             modelBuilder.Entity("CookieShop.Domain.Entities.ApplicationUser", b =>
@@ -173,7 +173,7 @@ namespace CookieShop.Infra.Migrations
 
                     b.HasIndex("ProvinceId");
 
-                    b.ToTable("City");
+                    b.ToTable("Cities");
                 });
 
             modelBuilder.Entity("CookieShop.Domain.Entities.Province", b =>
@@ -189,7 +189,7 @@ namespace CookieShop.Infra.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Province");
+                    b.ToTable("Provinces");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>

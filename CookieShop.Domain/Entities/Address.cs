@@ -14,8 +14,8 @@ public class Address
 
     [Required, MaxLength(16)] public required string PhoneNumber { get; set; }
 
-    public ApplicationUser User { get; set; } = null!;
     public Guid UserId { get; set; }
+    public ApplicationUser User { get; set; } = null!;
     
     public Guid ProvinceId { get; set; }
     public Province Province { get; set; } = null!;

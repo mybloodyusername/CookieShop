@@ -1,28 +1,45 @@
 using CookieShop.App.DTOs.Province;
 using CookieShop.App.Interfaces.Repositories;
 using CookieShop.Domain.Entities;
+using CookieShop.Infra.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace CookieShop.Infra.Repositories;
 
-public class ProvinceRepository : IProvinceRepository
+public class ProvinceRepository(CookieShopDbContext context) : IProvinceRepository
 {
-    public Task<Province> GetById(Guid id)
+    public async Task<Province?> GetById(Guid id)
     {
-        throw new NotImplementedException();
+        return await context.Provinces.FirstOrDefaultAsync(p => p.Id == id);
     }
 
-    public Task<Province> Create(CreateProvinceRequest request)
+    public async Task<Province?> Create(CreateProvinceRequest request)
     {
-        throw new NotImplementedException();
+        var result = await context.AddAsync(new Province
+        {
+            Name = request.Name
+        });
+        await context.SaveChangesAsync();
+        return result.Entity;
     }
 
-    public Task<Province> Update(UpdateProvinceRequest request)
+    public async Task<Province?> Update(UpdateProvinceRequest request)
     {
-        throw new NotImplementedException();
+        var province = await context.Provinces.FirstOrDefaultAsync(p => p.Id == request.Id);
+        if (province is null) return null;
+
+        province.Name = request.Name;
+        await context.SaveChangesAsync();
+        return province;
     }
 
-    public Task<Province> Delete(Guid id)
+    public async Task<bool> Delete(Guid id)
     {
-        throw new NotImplementedException();
+        var province = await context.Provinces.FirstOrDefaultAsync(p => p.Id == id);
+        if (province is null) return false;
+
+        context.Provinces.Remove(province);
+        await context.SaveChangesAsync();
+        return true;
     }
 }
