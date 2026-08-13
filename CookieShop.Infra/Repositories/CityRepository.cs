@@ -14,6 +14,11 @@ public class CityRepository(CookieShopDbContext context) : ICityRepository
         return await context.Cities.FirstOrDefaultAsync(c => c.Id == id);
     }
 
+    public async Task<ICollection<City>> GetByProvinceId(Guid id)
+    {
+        return await context.Cities.Where(c => c.ProvinceId == id).ToListAsync();
+    }
+
     public async Task<City> Create(CreateCityRequest request)
     {
         var result = await context.Cities.AddAsync(new City

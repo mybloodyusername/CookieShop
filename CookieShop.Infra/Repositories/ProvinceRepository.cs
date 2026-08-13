@@ -2,6 +2,7 @@ using CookieShop.App.DTOs.Province;
 using CookieShop.App.Interfaces.Repositories;
 using CookieShop.Domain.Entities;
 using CookieShop.Infra.Data;
+using Mapster;
 using Microsoft.EntityFrameworkCore;
 
 namespace CookieShop.Infra.Repositories;
@@ -10,10 +11,17 @@ public class ProvinceRepository(CookieShopDbContext context) : IProvinceReposito
 {
     public async Task<Province?> GetById(Guid id)
     {
-        return await context.Provinces.FirstOrDefaultAsync(p => p.Id == id);
+        return await context.Provinces
+            .Include(p => p.Cities)
+            .FirstOrDefaultAsync(p => p.Id == id);
     }
 
-    public async Task<Province?> Create(CreateProvinceRequest request)
+    public async Task<ICollection<Province>> GetAll()
+    {
+        return await context.Provinces.ToListAsync();
+    }
+
+    public async Task<Province> Create(CreateProvinceRequest request)
     {
         var result = await context.AddAsync(new Province
         {
