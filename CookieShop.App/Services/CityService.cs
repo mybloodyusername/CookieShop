@@ -60,7 +60,7 @@ public class CityService(ICityRepository cityRepository, ILogger<CityService> lo
             var result = await cityRepository.GetByProvinceId(id);
             return result.Adapt<List<CityResponse>>();
         }
-        catch (Exception e)
+        catch (DbUpdateException e)
         {
             logger.LogError(e, "Failed to fetch cities.");
             throw new ConflictException("Cities cannot be fetched. Make sure the province exists.");

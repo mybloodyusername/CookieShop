@@ -2,6 +2,7 @@ using CookieShop.App.DTOs.Province;
 using CookieShop.App.Exceptions;
 using CookieShop.App.Interfaces.Repositories;
 using Mapster;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace CookieShop.App.Services;
@@ -16,7 +17,7 @@ public class ProvinceService(IProvinceRepository provinceRepository, ILogger<Pro
             if (result is null) throw new NotFoundException("Province not found.");
             return result.Adapt<ProvinceDetailResponse>();
         }
-        catch (Exception e)
+        catch (DbUpdateException e)
         {
             logger.LogError(e, "Failed to fetch province.");
             throw new ConflictException("Province cannot be fetched.");
@@ -30,7 +31,7 @@ public class ProvinceService(IProvinceRepository provinceRepository, ILogger<Pro
             var province = await provinceRepository.Create(request);
             return province.Adapt<ProvinceResponse>();
         }
-        catch (Exception e)
+        catch (DbUpdateException e)
         {
             logger.LogError(e, "Failed to create province.");
             throw new ConflictException("Province cannot be created.");
@@ -45,7 +46,7 @@ public class ProvinceService(IProvinceRepository provinceRepository, ILogger<Pro
             if (province is null) throw new NotFoundException("Province not found.");
             return province.Adapt<ProvinceResponse>();
         }
-        catch (Exception e)
+        catch (DbUpdateException e)
         {
             logger.LogError(e, "Failed to update province.");
             throw new ConflictException("Province cannot be updated.");
@@ -60,7 +61,7 @@ public class ProvinceService(IProvinceRepository provinceRepository, ILogger<Pro
                 throw new NotFoundException("Province not found.");
             return true;
         }
-        catch (Exception e)
+        catch (DbUpdateException e)
         {
             logger.LogError(e, "Failed to delete province.");
             throw new ConflictException("Province cannot be deleted.");
@@ -74,7 +75,7 @@ public class ProvinceService(IProvinceRepository provinceRepository, ILogger<Pro
             var provinces = await provinceRepository.GetAll();
             return provinces.Adapt<List<ProvinceResponse>>();
         }
-        catch (Exception e)
+        catch (DbUpdateException e)
         {
             logger.LogError(e, "Failed to fetch provinces.");
             throw new ConflictException("Provinces cannot be fetched.");
