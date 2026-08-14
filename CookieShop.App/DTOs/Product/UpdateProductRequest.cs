@@ -5,12 +5,12 @@ namespace CookieShop.App.DTOs.Product;
 public record UpdateProductRequest(
     [Required] Guid Id,
     [Required, MaxLength(100)] string Name,
-    [MaxLength(500)] string Description,
-    [Required, Range(0.01, 1_000_000)] decimal Price,
+    [Required, Range(typeof(long), "1", "100000000000")] long Price,
     bool IsOnSale,
-    [Range(0.01, 1_000_000)] decimal? SalePrice,
-    [MaxLength(512)] string ImageUrl,
+    [Range(typeof(long), "1", "100000000000")] long? SalePrice,
     [Required, Range(0, 100_000)] int StockQuantity,
     bool IsAvailable,
-    [Required] Guid CategoryId
+    [Required] Guid CategoryId,
+    [MaxLength(500)] string Description = "",
+    [MaxLength(512)] string ImageUrl = ""
 );

@@ -15,7 +15,7 @@ public class Order
 
     public OrderStatus Status { get; set; } = OrderStatus.Pending;
 
-    public decimal TotalAmount { get; set; }
+    public long TotalAmount { get; set; }
 
     [MaxLength(256)] public string? Note { get; set; }
 

@@ -5,6 +5,7 @@ using CookieShop.App.DTOs.Auth;
 using CookieShop.App.DTOs.User;
 using CookieShop.App.Exceptions;
 using CookieShop.App.Interfaces.Repositories;
+using CookieShop.Domain.Constants;
 using CookieShop.Domain.Entities;
 using Mapster;
 using Microsoft.AspNetCore.Http;
@@ -81,7 +82,11 @@ public class AuthService(
             PhoneNumber = request.PhoneNumber,
             Password = request.Password,
         });
-        return new RegisterResponse{
+        var assignRole = await userRepository.AssignRole(newUser, UserRole.Customer);
+        if (assignRole != UserRole.Customer)
+            throw new ConflictException("Role cannot be assigned");
+        return new RegisterResponse
+        {
             IsSuccess = true,
         };
     }

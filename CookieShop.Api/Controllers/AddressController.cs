@@ -39,7 +39,6 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Admin)]
         [Authorize(Roles = UserRole.Customer)]
         [HttpDelete("{id}")]
         public async Task<ActionResult> Delete(Guid id)

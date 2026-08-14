@@ -14,7 +14,7 @@ public class OrderItem
 
     [Required, MaxLength(100)] public required string ProductName { get; set; }
 
-    public decimal UnitPrice { get; set; }
+    public long UnitPrice { get; set; }
 
     public int Quantity { get; set; }
 }
