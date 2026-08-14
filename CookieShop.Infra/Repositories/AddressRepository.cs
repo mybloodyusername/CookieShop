@@ -10,15 +10,15 @@ public class AddressRepository(CookieShopDbContext context) : IAddressRepository
 {
     public async Task<Address?> GetById(Guid id)
     {
-        return await context.Addresses.FirstOrDefaultAsync(a => a.Id == id);
+        return await context.Addresses.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
     }
 
-    public async Task<ICollection<Address>> GetAllByUserId(Guid id)
+    public async Task<IReadOnlyCollection<Address>> GetAllByUserId(Guid id)
     {
-        return await context.Addresses.Where(a => a.UserId == id).ToListAsync();
+        return await context.Addresses.AsNoTracking().Where(a => a.UserId == id).ToListAsync();
     }
 
-    public async Task<Address?> Create(CreateAddressRequest request)
+    public async Task<Address> Create(CreateAddressRequest request)
     {
         var result = await context.Addresses.AddAsync(new Address
         {
