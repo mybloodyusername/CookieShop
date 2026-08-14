@@ -16,11 +16,4 @@ public class Address
 
     public Guid UserId { get; set; }
     public ApplicationUser User { get; set; } = null!;
-    
-    public Guid ProvinceId { get; set; }
-    public Province Province { get; set; } = null!;
-
-    public Guid CityId { get; set; }
-    public City City { get; set; } = null!;
-    
 }

@@ -1,5 +1,3 @@
-using CookieShop.App.DTOs.City;
-using CookieShop.App.DTOs.Province;
 using CookieShop.App.DTOs.User;
 
 namespace CookieShop.App.DTOs.Address;
@@ -13,7 +11,5 @@ public record AddressDetailResponse(
     Guid UserId,
     UserResponse User,
     Guid ProvinceId,
-    ProvinceResponse Province,
-    Guid CityId,
-    CityResponse City
+    Guid CityId
 );

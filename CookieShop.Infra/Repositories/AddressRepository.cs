@@ -27,8 +27,6 @@ public class AddressRepository(CookieShopDbContext context) : IAddressRepository
             AddressLine2 = request.AddressLine2,
             PhoneNumber = request.PhoneNumber,
             UserId = request.UserId,
-            ProvinceId = request.ProvinceId,
-            CityId = request.CityId,
         });
         await context.SaveChangesAsync();
         return result.Entity;
@@ -44,8 +42,6 @@ public class AddressRepository(CookieShopDbContext context) : IAddressRepository
         address.AddressLine2 = request.AddressLine2;
         address.PhoneNumber = request.PhoneNumber;
         address.UserId = request.UserId;
-        address.ProvinceId = request.ProvinceId;
-        address.CityId = request.CityId;
 
         await context.SaveChangesAsync();
         return address;

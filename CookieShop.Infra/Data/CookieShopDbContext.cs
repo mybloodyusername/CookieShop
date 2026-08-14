@@ -9,8 +9,6 @@ namespace CookieShop.Infra.Data;
 public class CookieShopDbContext(DbContextOptions<CookieShopDbContext> options)
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>(options)
 {
-    public DbSet<City> Cities => Set<City>();
-    public DbSet<Province> Provinces => Set<Province>();
     public DbSet<Address> Addresses => Set<Address>();
 
     protected override void OnModelCreating(ModelBuilder builder)
