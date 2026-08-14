@@ -9,7 +9,5 @@ public record UpdateAddressRequest(
     [Required, MaxLength(256)] string AddressLine1,
     [MaxLength(256)] string AddressLine2,
     [Required, MaxLength(16)] string PhoneNumber,
-    [Required] Guid UserId,
-    [Required] Guid ProvinceId,
-    [Required] Guid CityId
+    [Required] Guid UserId
 );

@@ -8,7 +8,5 @@ public record AddressResponse(
     string AddressLine1,
     string AddressLine2,
     string PhoneNumber,
-    Guid UserId,
-    Guid ProvinceId,
-    Guid CityId
+    Guid UserId
 );

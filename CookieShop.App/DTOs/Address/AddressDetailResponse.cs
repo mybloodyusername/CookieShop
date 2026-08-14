@@ -9,7 +9,5 @@ public record AddressDetailResponse(
     string AddressLine2,
     string PhoneNumber,
     Guid UserId,
-    UserResponse User,
-    Guid ProvinceId,
-    Guid CityId
+    UserResponse User
 );
