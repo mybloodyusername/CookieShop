@@ -25,8 +25,10 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddCorsPolicies(builder.Configuration);
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IAddressRepository, AddressRepository>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AddressService>();
 
 
 var app = builder.Build();
