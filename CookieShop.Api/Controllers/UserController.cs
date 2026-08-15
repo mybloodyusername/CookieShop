@@ -32,7 +32,9 @@ namespace CookieShop.Api.Controllers
         public async Task<ActionResult<UserResponse>> Me()
         {
             var userId = User.GetUserId();
+            var role = User.GetRole();
             var result = await userService.Me(userId);
+            result.Role = role;
             return Ok(result);
         }
 

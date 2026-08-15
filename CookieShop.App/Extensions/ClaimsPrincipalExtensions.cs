@@ -12,4 +12,10 @@ public static class ClaimsPrincipalExtensions
             ? userId
             : throw new UnauthorizedAccessException("Invalid user id in token.");
     }
+
+    public static string GetRole(this ClaimsPrincipal principal)
+    {
+        var value = principal.FindFirstValue(ClaimTypes.Role);
+        return value ?? throw new UnauthorizedAccessException("Invalid user name in token.");
+    }
 }
