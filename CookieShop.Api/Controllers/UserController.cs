@@ -27,7 +27,7 @@ namespace CookieShop.Api.Controllers
             throw new NotImplementedException();
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize]
         [HttpGet("Me")]
         public async Task<ActionResult<UserResponse>> Me()
         {

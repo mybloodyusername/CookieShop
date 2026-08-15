@@ -10,11 +10,11 @@ public class Product
 
     [MaxLength(500)] public string Description { get; set; } = string.Empty;
 
-    public long Price { get; set; }
+    public decimal Price { get; set; }
 
     public bool IsOnSale { get; set; }
 
-    public long? SalePrice { get; set; }
+    public decimal? SalePrice { get; set; }
 
     [MaxLength(512)] public string ImageUrl { get; set; } = string.Empty;
 

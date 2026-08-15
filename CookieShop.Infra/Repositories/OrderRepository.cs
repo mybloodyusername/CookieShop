@@ -57,7 +57,7 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
             .Where(p => productIds.Contains(p.Id))
             .ToListAsync();
 
-        var total = 0L;
+        var total = 0m;
         var orderItems = new List<OrderItem>();
 
         foreach (var item in cart.Items)

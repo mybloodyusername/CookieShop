@@ -4,7 +4,7 @@ public record OrderResponse(
     Guid Id,
     Guid UserId,
     string Status,
-    long TotalAmount,
+    decimal TotalAmount,
     string? Note,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt

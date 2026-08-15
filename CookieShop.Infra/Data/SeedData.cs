@@ -89,7 +89,7 @@ public static class SeedData
                 {
                     Name = "Classic Chocolate Chip",
                     Description = "The timeless favorite — crispy edges, gooey center.",
-                    Price = 49_000, IsOnSale = true, SalePrice = 39_000,
+                    Price = 5.99m, IsOnSale = true, SalePrice = 4.49m,
                     ImageUrl = "https://images.example.com/cookies/classic-chocolate-chip.png",
                     StockQuantity = 50, IsAvailable = true,
                     CategoryId = categories["Chocolate Chip"].Id
@@ -98,7 +98,7 @@ public static class SeedData
                 {
                     Name = "Double Chocolate",
                     Description = "Double the cocoa for the serious chocolate lover.",
-                    Price = 59_000, IsOnSale = true, SalePrice = 49_000,
+                    Price = 6.49m, IsOnSale = true, SalePrice = 5.49m,
                     ImageUrl = "https://images.example.com/cookies/double-chocolate.png",
                     StockQuantity = 40, IsAvailable = true,
                     CategoryId = categories["Chocolate Chip"].Id
@@ -107,7 +107,7 @@ public static class SeedData
                 {
                     Name = "Oatmeal Raisin",
                     Description = "Hearty oats, sweet raisins, a hint of cinnamon.",
-                    Price = 39_000, IsOnSale = true, SalePrice = 29_000,
+                    Price = 4.99m, IsOnSale = true, SalePrice = 3.99m,
                     ImageUrl = "https://images.example.com/cookies/oatmeal-raisin.png",
                     StockQuantity = 35, IsAvailable = true,
                     CategoryId = categories["Oatmeal"].Id
@@ -116,7 +116,7 @@ public static class SeedData
                 {
                     Name = "Snickerdoodle",
                     Description = "Soft and chewy, rolled in cinnamon sugar.",
-                    Price = 34_000,
+                    Price = 4.49m,
                     ImageUrl = "https://images.example.com/cookies/snickerdoodle.png",
                     StockQuantity = 45, IsAvailable = true,
                     CategoryId = categories["Classic"].Id
@@ -125,7 +125,7 @@ public static class SeedData
                 {
                     Name = "Sugar Cookie",
                     Description = "Buttery, simple, and perfect with a cup of tea.",
-                    Price = 29_000,
+                    Price = 3.99m,
                     ImageUrl = "https://images.example.com/cookies/sugar-cookie.png",
                     StockQuantity = 60, IsAvailable = true,
                     CategoryId = categories["Classic"].Id
@@ -134,7 +134,7 @@ public static class SeedData
                 {
                     Name = "Peanut Butter Sandwich",
                     Description = "Creamy peanut butter filling between two soft cookies.",
-                    Price = 44_000,
+                    Price = 5.49m,
                     ImageUrl = "https://images.example.com/cookies/peanut-butter-sandwich.png",
                     StockQuantity = 30, IsAvailable = true,
                     CategoryId = categories["Filled"].Id

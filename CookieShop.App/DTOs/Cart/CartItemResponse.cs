@@ -4,8 +4,8 @@ public record CartItemResponse(
     Guid ProductId,
     string ProductName,
     string ImageUrl,
-    long OriginalPrice,
-    long UnitPrice,
+    decimal OriginalPrice,
+    decimal UnitPrice,
     int Quantity,
-    long LineTotal
+    decimal LineTotal
 );
