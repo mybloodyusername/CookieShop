@@ -9,7 +9,7 @@ namespace CookieShop.Api.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UserController(UserService userService) : ControllerBase
+    public class UserController(UserService userService, AuthService authService) : ControllerBase
     {
         [Authorize(Roles = UserRole.Customer)]
         [HttpPut("Update")]
@@ -22,9 +22,10 @@ namespace CookieShop.Api.Controllers
 
         [Authorize(Roles = UserRole.Customer)]
         [HttpPost("ChangePassword")]
-        public Task<ActionResult> ChangePassword()
+        public async Task<ActionResult> ChangePassword([FromBody] CookieShop.App.DTOs.Auth.ChangePasswordRequest request)
         {
-            throw new NotImplementedException();
+            await authService.ChangePassword(User.GetUserId(), request);
+            return NoContent();
         }
 
         [Authorize]
@@ -72,9 +73,9 @@ namespace CookieShop.Api.Controllers
 
         [Authorize(Roles = UserRole.Admin)]
         [HttpGet("GetAllByAdmin")]
-        public Task<ActionResult> GetAll()
+        public async Task<ActionResult> GetAll(int page = 1, int pageSize = 30)
         {
-            throw new NotImplementedException();
+            return Ok(await userService.GetAll(page, pageSize));
         }
     }
 }

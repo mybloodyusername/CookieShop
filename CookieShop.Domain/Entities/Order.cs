@@ -13,8 +13,14 @@ public class Order
     public Guid AddressId { get; set; }
     public Address Address { get; set; } = null!;
 
+    [MaxLength(64)] public string ShippingTitle { get; set; } = "";
+    [MaxLength(256)] public string ShippingAddressLine1 { get; set; } = "";
+    [MaxLength(256)] public string ShippingAddressLine2 { get; set; } = "";
+    [MaxLength(16)] public string ShippingPhoneNumber { get; set; } = "";
+
     public OrderStatus Status { get; set; } = OrderStatus.Pending;
 
+    /// <summary>Whole Iranian toman (IRT), without fractional units.</summary>
     public decimal TotalAmount { get; set; }
 
     [MaxLength(256)] public string? Note { get; set; }

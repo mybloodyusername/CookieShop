@@ -10,6 +10,7 @@ public class Product
 
     [MaxLength(500)] public string Description { get; set; } = string.Empty;
 
+    /// <summary>Whole Iranian toman (IRT), without fractional units.</summary>
     public decimal Price { get; set; }
 
     public bool IsOnSale { get; set; }
@@ -27,6 +28,8 @@ public class Product
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
 
     public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
     public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();

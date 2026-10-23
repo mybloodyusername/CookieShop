@@ -13,6 +13,7 @@ public class CartRepository(CookieShopDbContext context) : ICartRepository
         return await context.Carts.AsNoTracking()
             .Include(c => c.Items)
             .ThenInclude(i => i.Product)
+            .ThenInclude(p => p.Images)
             .FirstOrDefaultAsync(c => c.UserId == userId);
     }
 

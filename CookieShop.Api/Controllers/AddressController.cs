@@ -43,7 +43,7 @@ namespace CookieShop.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult> Delete(Guid id)
         {
-            var result = await addressService.Delete(id);
+            var result = await addressService.Delete(id, User.GetUserId());
             return Ok(new { success = result });
         }
 

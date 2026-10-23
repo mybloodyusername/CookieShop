@@ -24,7 +24,7 @@ public class AddressService(IAddressRepository addressRepository, ILogger<Addres
         }
         catch (DbUpdateException e)
         {
-            logger.LogError("Failed to create address for user {UserId}", request.UserId);
+            logger.LogError(e, "Failed to create address for user {UserId}", request.UserId);
             throw new ConflictException("Failed to create address");
         }
     }
@@ -40,16 +40,16 @@ public class AddressService(IAddressRepository addressRepository, ILogger<Addres
         }
         catch (DbUpdateException e)
         {
-            logger.LogError("Failed to update address with {AddressId} for user {UserId}", request.Id, request.UserId);
+            logger.LogError(e, "Failed to update address with {AddressId} for user {UserId}", request.Id, request.UserId);
             throw new ConflictException("Failed to update address");
         }
     }
 
-    public async Task<bool> Delete(Guid id)
+    public async Task<bool> Delete(Guid id, Guid userId)
     {
         try
         {
-            if (!await addressRepository.Delete(id))
+            if (!await addressRepository.Delete(id, userId))
                 throw new NotFoundException("Address not found.");
             return true;
         }

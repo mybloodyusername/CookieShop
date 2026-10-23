@@ -8,4 +8,7 @@ public record OrderResponse(
     string? Note,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt
-);
+)
+{
+    public string Currency => CookieShop.Domain.Constants.StoreCurrency.Code;
+}

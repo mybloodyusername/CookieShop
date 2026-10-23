@@ -31,7 +31,7 @@ public class OrderService(
             if (detail is null) throw new NotFoundException("Order not found");
             return ToDetail(detail);
         }
-        catch (DbUpdateException e)
+        catch (DbUpdateException e) when (e is not DbUpdateConcurrencyException)
         {
             logger.LogError(e, "Failed to place order for user {UserId}", userId);
             throw new ConflictException("Failed to place order");
@@ -127,7 +127,7 @@ public class OrderService(
         order.Note,
         order.CreatedAt,
         order.UpdatedAt,
-        order.Address.Adapt<AddressResponse>(),
+        new AddressResponse(order.AddressId, order.ShippingTitle, order.ShippingAddressLine1, order.ShippingAddressLine2, order.ShippingPhoneNumber, order.UserId),
         order.Items.Select(ToItemResponse).ToList());
 
     private static OrderItemResponse ToItemResponse(OrderItem item) => new(

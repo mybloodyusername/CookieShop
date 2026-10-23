@@ -11,6 +11,7 @@ namespace CookieShop.Api.Controllers
     [ApiController]
     public class ProductController(ProductService productService) : ControllerBase
     {
+        [AllowAnonymous]
         [HttpGet]
         public async Task<ActionResult<PagedResult<ProductResponse>>> GetAll(
             Guid? categoryId, string? search, int page = 1, int pageSize = 10)
@@ -19,6 +20,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
+        [AllowAnonymous]
         [HttpGet("{id}")]
         public async Task<ActionResult<ProductDetailResponse>> GetById(Guid id)
         {

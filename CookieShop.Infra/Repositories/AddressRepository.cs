@@ -34,7 +34,7 @@ public class AddressRepository(CookieShopDbContext context) : IAddressRepository
 
     public async Task<Address?> Update(UpdateAddressRequest request)
     {
-        var address = await context.Addresses.FirstOrDefaultAsync(a => a.Id == request.Id);
+        var address = await context.Addresses.FirstOrDefaultAsync(a => a.Id == request.Id && a.UserId == request.UserId);
         if (address is null) return null;
 
         address.Title = request.Title;
@@ -47,9 +47,9 @@ public class AddressRepository(CookieShopDbContext context) : IAddressRepository
         return address;
     }
 
-    public async Task<bool> Delete(Guid id)
+    public async Task<bool> Delete(Guid id, Guid userId)
     {
-        var address = await context.Addresses.FirstOrDefaultAsync(p => p.Id == id);
+        var address = await context.Addresses.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
         if (address is null) return false;
 
         context.Addresses.Remove(address);

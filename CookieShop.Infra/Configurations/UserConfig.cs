@@ -10,5 +10,6 @@ public class UserConfig : IEntityTypeConfiguration<ApplicationUser>
     {
         builder.HasIndex(e => e.PhoneNumber).IsUnique();
         builder.HasIndex(e => e.Email).IsUnique();
+        builder.HasIndex(e => e.NormalizedEmail).IsUnique();
     }
 }

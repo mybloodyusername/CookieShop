@@ -9,5 +9,5 @@ public interface IAddressRepository
     public Task<IReadOnlyCollection<Address>> GetAllByUserId(Guid id);
     public Task<Address> Create(CreateAddressRequest request);
     public Task<Address?> Update(UpdateAddressRequest request);
-    public Task<bool> Delete(Guid id);
+    public Task<bool> Delete(Guid id, Guid userId);
 }

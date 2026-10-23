@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace CookieShop.Infra.Extensions;
 
@@ -21,7 +22,8 @@ public static class HostExtension
             var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
             var roleManager = services.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
 
-            await context.Database.MigrateAsync();
+            if (services.GetRequiredService<IConfiguration>().GetValue<bool>("Database:ApplyMigrationsOnStartup"))
+                await context.Database.MigrateAsync();
             await SeedData.Initialize(logger, services, userManager, roleManager);
         }
     }

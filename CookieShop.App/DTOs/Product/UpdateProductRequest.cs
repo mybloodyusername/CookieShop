@@ -5,9 +5,9 @@ namespace CookieShop.App.DTOs.Product;
 public record UpdateProductRequest(
     [Required] Guid Id,
     [Required, MaxLength(100)] string Name,
-    [Required, Range(0.01, 1_000_000)] decimal Price,
+    [Required, Range(1, 999_999_999_999d)] decimal Price,
     bool IsOnSale,
-    [Range(0.01, 1_000_000)] decimal? SalePrice,
+    [Range(1, 999_999_999_999d)] decimal? SalePrice,
     [Required, Range(0, 100_000)] int StockQuantity,
     bool IsAvailable,
     [Required] Guid CategoryId,

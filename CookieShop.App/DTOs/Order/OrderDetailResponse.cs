@@ -12,4 +12,7 @@ public record OrderDetailResponse(
     DateTimeOffset UpdatedAt,
     AddressResponse Address,
     IReadOnlyCollection<OrderItemResponse> Items
-);
+)
+{
+    public string Currency => CookieShop.Domain.Constants.StoreCurrency.Code;
+}

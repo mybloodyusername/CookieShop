@@ -2,6 +2,7 @@ using CookieShop.App.DTOs.Common;
 using CookieShop.App.Exceptions;
 using CookieShop.App.Interfaces.Repositories;
 using CookieShop.Domain.Entities;
+using CookieShop.Domain.Constants;
 using CookieShop.Domain.Enums;
 using CookieShop.Infra.Data;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,9 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
 
     public async Task<Order> PlaceOrder(Guid userId, Guid addressId, string? note)
     {
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        var address = await context.Addresses.AsNoTracking().FirstOrDefaultAsync(x => x.Id == addressId && x.UserId == userId)
+            ?? throw new NotFoundException("Address not found.");
         var cart = await context.Carts
             .Include(c => c.Items)
             .FirstOrDefaultAsync(c => c.UserId == userId);
@@ -62,6 +66,7 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
 
         foreach (var item in cart.Items)
         {
+            if (item.Quantity < 1) throw new ConflictException("Invalid cart quantity.");
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product is null)
                 throw new ConflictException("A product in your cart is no longer available.");
@@ -75,6 +80,7 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
 
             var unitPrice = product.IsOnSale && product.SalePrice is { } sale ? sale : product.Price;
             total += unitPrice * item.Quantity;
+            if (!StoreCurrency.IsValid(total)) throw new ConflictException("Order total exceeds the supported toman amount.");
 
             orderItems.Add(new OrderItem
             {
@@ -91,6 +97,10 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
         {
             UserId = userId,
             AddressId = addressId,
+            ShippingTitle = address.Title,
+            ShippingAddressLine1 = address.AddressLine1,
+            ShippingAddressLine2 = address.AddressLine2,
+            ShippingPhoneNumber = address.PhoneNumber,
             Status = OrderStatus.Pending,
             TotalAmount = total,
             Note = note,
@@ -101,15 +111,18 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
         context.CartItems.RemoveRange(cart.Items);
 
         await context.SaveChangesAsync();
+        await transaction.CommitAsync();
         return order;
     }
 
     public async Task<Order?> Cancel(Guid id)
     {
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var order = await context.Orders
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == id);
         if (order is null) return null;
+        if (order.Status != OrderStatus.Pending) throw new ConflictException("Only pending orders can be cancelled.");
 
         var productIds = order.Items.Select(i => i.ProductId).ToList();
         var products = await context.Products
@@ -127,14 +140,21 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
         order.UpdatedAt = DateTimeOffset.UtcNow;
 
         await context.SaveChangesAsync();
+        await transaction.CommitAsync();
         return order;
     }
 
     public async Task<Order?> UpdateStatus(Guid id, OrderStatus newStatus)
     {
+        if (newStatus == OrderStatus.Cancelled) return await Cancel(id);
         var order = await context.Orders.FirstOrDefaultAsync(o => o.Id == id);
         if (order is null) return null;
 
+        var allowed = (order.Status, newStatus) is
+            (OrderStatus.Pending, OrderStatus.Paid) or
+            (OrderStatus.Paid, OrderStatus.Shipped) or
+            (OrderStatus.Shipped, OrderStatus.Delivered);
+        if (!allowed) throw new ConflictException("Invalid order status transition.");
         order.Status = newStatus;
         order.UpdatedAt = DateTimeOffset.UtcNow;
 

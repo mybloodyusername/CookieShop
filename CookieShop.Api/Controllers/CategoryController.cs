@@ -10,6 +10,7 @@ namespace CookieShop.Api.Controllers
     [ApiController]
     public class CategoryController(CategoryService categoryService) : ControllerBase
     {
+        [AllowAnonymous]
         [HttpGet]
         public async Task<ActionResult<IReadOnlyCollection<CategoryResponse>>> GetAll()
         {

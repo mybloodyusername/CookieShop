@@ -13,12 +13,13 @@ public class ProductRepository(CookieShopDbContext context) : IProductRepository
     {
         return await context.Products.AsNoTracking()
             .Include(p => p.Category)
+            .Include(p => p.Images).ThenInclude(x => x.Image)
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
     public async Task<PagedResult<Product>> GetFiltered(Guid? categoryId, string? search, int page, int pageSize)
     {
-        var query = context.Products.AsNoTracking().Where(p => p.IsAvailable);
+        var query = context.Products.AsNoTracking().Include(p => p.Images).ThenInclude(x => x.Image).Where(p => p.IsAvailable);
 
         if (categoryId.HasValue)
             query = query.Where(p => p.CategoryId == categoryId.Value);
