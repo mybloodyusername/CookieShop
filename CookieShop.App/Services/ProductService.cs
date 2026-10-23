@@ -1,4 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using CookieShop.Domain.Constants;
+using CookieShop.App.DTOs.Media;
+using CookieShop.Domain.Entities;
 using CookieShop.App.DTOs.Common;
 using CookieShop.App.DTOs.Product;
 using CookieShop.App.Exceptions;
@@ -9,13 +12,14 @@ using Microsoft.Extensions.Logging;
 
 namespace CookieShop.App.Services;
 
-public class ProductService(IProductRepository productRepository, ILogger<ProductService> logger)
+public class ProductService(IProductRepository productRepository, ILogger<ProductService> logger, MediaUrlProvider urls)
 {
     public async Task<ProductDetailResponse> GetById(Guid id)
     {
         var result = await productRepository.GetById(id);
         if (result is null) throw new NotFoundException("Product not found");
-        return result.Adapt<ProductDetailResponse>();
+        var response = result.Adapt<ProductDetailResponse>();
+        return response with { Images = Images(result), ImageUrl = Images(result).FirstOrDefault()?.Url ?? result.ImageUrl };
     }
 
     public async Task<PagedResult<ProductResponse>> GetAll(Guid? categoryId, string? search, int page, int pageSize)
@@ -25,7 +29,7 @@ public class ProductService(IProductRepository productRepository, ILogger<Produc
 
         var result = await productRepository.GetFiltered(categoryId, search, page, pageSize);
         return new PagedResult<ProductResponse>(
-            result.Items.Adapt<IReadOnlyCollection<ProductResponse>>(),
+            result.Items.Select(x => x.Adapt<ProductResponse>() with { Images = Images(x), ImageUrl = Images(x).FirstOrDefault()?.Url ?? x.ImageUrl }).ToList(),
             result.TotalCount,
             result.Page,
             result.PageSize);
@@ -77,8 +81,16 @@ public class ProductService(IProductRepository productRepository, ILogger<Produc
         }
     }
 
+    private IReadOnlyCollection<ProductImageResponse> Images(Product product) => product.Images
+        .OrderBy(x => x.SortOrder).ThenBy(x => x.ImageId)
+        .Select(x => new ProductImageResponse(x.ImageId, urls.Get(x.ImageId), x.Alt ?? x.Image.Alt, x.SortOrder)).ToList();
+
     private static void Validate(CreateProductRequest request)
     {
+        if (!StoreCurrency.IsValid(request.Price) || request.Price < 1 ||
+            (request.SalePrice is { } sale && (!StoreCurrency.IsValid(sale) || sale < 1 || sale >= request.Price)))
+            throw new ValidationException("Prices must be whole toman; sale price must be positive and below regular price.");
+        if (request.CategoryId == Guid.Empty) throw new ValidationException("Category is required.");
         if (request.IsOnSale && request.SalePrice is null)
             throw new ValidationException("SalePrice is required when IsOnSale is true.");
         if (request.StockQuantity < 0)
@@ -87,6 +99,10 @@ public class ProductService(IProductRepository productRepository, ILogger<Produc
 
     private static void Validate(UpdateProductRequest request)
     {
+        if (!StoreCurrency.IsValid(request.Price) || request.Price < 1 ||
+            (request.SalePrice is { } sale && (!StoreCurrency.IsValid(sale) || sale < 1 || sale >= request.Price)))
+            throw new ValidationException("Prices must be whole toman; sale price must be positive and below regular price.");
+        if (request.CategoryId == Guid.Empty) throw new ValidationException("Category is required.");
         if (request.IsOnSale && request.SalePrice is null)
             throw new ValidationException("SalePrice is required when IsOnSale is true.");
         if (request.StockQuantity < 0)

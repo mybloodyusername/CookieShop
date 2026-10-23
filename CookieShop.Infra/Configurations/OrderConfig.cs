@@ -8,6 +8,11 @@ public class OrderConfig : IEntityTypeConfiguration<Order>
 {
     public void Configure(EntityTypeBuilder<Order> builder)
     {
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("CK_Order_Total", "\"TotalAmount\" >= 0 AND \"TotalAmount\" = trunc(\"TotalAmount\")");
+        });
+        builder.Property<uint>("Version").IsRowVersion();
         builder.Property(e => e.TotalAmount).HasPrecision(18, 2);
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
 

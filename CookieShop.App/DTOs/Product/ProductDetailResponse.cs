@@ -16,4 +16,8 @@ public record ProductDetailResponse(
     CategoryResponse Category,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt
-);
+)
+{
+    public string Currency => CookieShop.Domain.Constants.StoreCurrency.Code;
+    public IReadOnlyCollection<CookieShop.App.DTOs.Media.ProductImageResponse> Images { get; init; } = [];
+}

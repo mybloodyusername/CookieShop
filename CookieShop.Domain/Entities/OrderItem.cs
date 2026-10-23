@@ -14,6 +14,7 @@ public class OrderItem
 
     [Required, MaxLength(100)] public required string ProductName { get; set; }
 
+    /// <summary>Whole Iranian toman (IRT), without fractional units.</summary>
     public decimal UnitPrice { get; set; }
 
     public int Quantity { get; set; }

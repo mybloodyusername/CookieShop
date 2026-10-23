@@ -3,6 +3,7 @@ using CookieShop.App.DTOs.User;
 using CookieShop.App.Exceptions;
 using CookieShop.App.Interfaces.Repositories;
 using CookieShop.Domain.Entities;
+using CookieShop.Domain.Constants;
 using CookieShop.Infra.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +33,7 @@ public class UserRepository(
             await context.Users.FirstOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber);
         if (existingUserByPhoneNumber != null) throw new DuplicateException("PhoneNumber already exists.");
 
+        await using var transaction = await context.Database.BeginTransactionAsync();
         var newUser = new ApplicationUser
         {
             Email = request.Email,
@@ -44,7 +46,13 @@ public class UserRepository(
         };
 
         var userResult = await userManager.CreateAsync(newUser, request.Password);
-        if (userResult.Succeeded) return newUser;
+        if (userResult.Succeeded)
+        {
+            var roleResult = await userManager.AddToRoleAsync(newUser, UserRole.Customer);
+            if (!roleResult.Succeeded) throw new ValidationException(string.Join("; ", roleResult.Errors.Select(x => x.Description)));
+            await transaction.CommitAsync();
+            return newUser;
+        }
         var errors = string.Join("; ", userResult.Errors.Select(e => e.Description));
         throw new ValidationException(errors);
     }
@@ -54,12 +62,18 @@ public class UserRepository(
         var existingUser = await userManager.FindByIdAsync(request.Id.ToString());
         if (existingUser == null) throw new NotFoundException("User not found.");
 
+        if (await context.Users.AnyAsync(x => x.Id != request.Id && x.PhoneNumber == request.PhoneNumber))
+            throw new DuplicateException("Phone number already exists.");
+        existingUser.PhoneNumberConfirmed = existingUser.PhoneNumber == request.PhoneNumber && existingUser.PhoneNumberConfirmed;
+        existingUser.EmailConfirmed = existingUser.Email == request.Email && existingUser.EmailConfirmed;
+        existingUser.UserName = request.PhoneNumber;
         existingUser.PhoneNumber = request.PhoneNumber;
         existingUser.Email = request.Email;
         existingUser.FirstName = request.FirstName;
         existingUser.LastName = request.LastName;
         existingUser.UpdatedAt = DateTime.UtcNow;
 
+        existingUser.SecurityStamp = Guid.NewGuid().ToString();
         var result = await userManager.UpdateAsync(existingUser);
         if (result.Succeeded) return existingUser;
         var errors = string.Join("; ", result.Errors.Select(e => e.Description));

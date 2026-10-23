@@ -133,6 +133,7 @@ namespace CookieShop.Infra.Migrations
                         .IsUnique();
 
                     b.HasIndex("NormalizedEmail")
+                        .IsUnique()
                         .HasDatabaseName("EmailIndex");
 
                     b.HasIndex("NormalizedUserName")
@@ -177,6 +178,12 @@ namespace CookieShop.Infra.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ProductId");
@@ -184,7 +191,10 @@ namespace CookieShop.Infra.Migrations
                     b.HasIndex("CartId", "ProductId")
                         .IsUnique();
 
-                    b.ToTable("CartItems");
+                    b.ToTable("CartItems", t =>
+                        {
+                            t.HasCheckConstraint("CK_CartItem_Quantity", "\"Quantity\" BETWEEN 1 AND 1000");
+                        });
                 });
 
             modelBuilder.Entity("CookieShop.Domain.Entities.Category", b =>
@@ -206,6 +216,76 @@ namespace CookieShop.Infra.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("CookieShop.Domain.Entities.ImageBlob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ImageBlobs");
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.MediaImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Album")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Alt")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("ByteLength")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("StorageProvider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Album");
+
+                    b.HasIndex("CreatedAt", "Id");
+
+                    b.ToTable("MediaImages");
+                });
+
             modelBuilder.Entity("CookieShop.Domain.Entities.Order", b =>
                 {
                     b.Property<Guid>("Id")
@@ -222,6 +302,26 @@ namespace CookieShop.Infra.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("ShippingAddressLine1")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ShippingAddressLine2")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ShippingPhoneNumber")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("ShippingTitle")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -237,13 +337,22 @@ namespace CookieShop.Infra.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AddressId");
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Orders");
+                    b.ToTable("Orders", t =>
+                        {
+                            t.HasCheckConstraint("CK_Order_Total", "\"TotalAmount\" >= 0 AND \"TotalAmount\" = trunc(\"TotalAmount\")");
+                        });
                 });
 
             modelBuilder.Entity("CookieShop.Domain.Entities.OrderItem", b =>
@@ -276,7 +385,12 @@ namespace CookieShop.Infra.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.ToTable("OrderItems");
+                    b.ToTable("OrderItems", t =>
+                        {
+                            t.HasCheckConstraint("CK_OrderItem_Price", "\"UnitPrice\" >= 1 AND \"UnitPrice\" = trunc(\"UnitPrice\")");
+
+                            t.HasCheckConstraint("CK_OrderItem_Quantity", "\"Quantity\" BETWEEN 1 AND 1000");
+                        });
                 });
 
             modelBuilder.Entity("CookieShop.Domain.Entities.Product", b =>
@@ -326,11 +440,50 @@ namespace CookieShop.Infra.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
 
-                    b.ToTable("Products");
+                    b.ToTable("Products", t =>
+                        {
+                            t.HasCheckConstraint("CK_Product_Price", "\"Price\" >= 1 AND \"Price\" <= 999999999999 AND \"Price\" = trunc(\"Price\")");
+
+                            t.HasCheckConstraint("CK_Product_SalePrice", "\"SalePrice\" IS NULL OR (\"SalePrice\" >= 1 AND \"SalePrice\" < \"Price\" AND \"SalePrice\" = trunc(\"SalePrice\"))");
+
+                            t.HasCheckConstraint("CK_Product_SaleRequired", "NOT \"IsOnSale\" OR \"SalePrice\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_Product_Stock", "\"StockQuantity\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.ProductImage", b =>
+                {
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ImageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Alt")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ProductId", "ImageId");
+
+                    b.HasIndex("ImageId");
+
+                    b.HasIndex("ProductId", "SortOrder");
+
+                    b.ToTable("ProductImages");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
@@ -504,6 +657,15 @@ namespace CookieShop.Infra.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("CookieShop.Domain.Entities.ImageBlob", b =>
+                {
+                    b.HasOne("CookieShop.Domain.Entities.MediaImage", null)
+                        .WithOne()
+                        .HasForeignKey("CookieShop.Domain.Entities.ImageBlob", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("CookieShop.Domain.Entities.Order", b =>
                 {
                     b.HasOne("CookieShop.Domain.Entities.Address", "Address")
@@ -551,6 +713,25 @@ namespace CookieShop.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.ProductImage", b =>
+                {
+                    b.HasOne("CookieShop.Domain.Entities.MediaImage", "Image")
+                        .WithMany("Products")
+                        .HasForeignKey("ImageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CookieShop.Domain.Entities.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Image");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -619,6 +800,11 @@ namespace CookieShop.Infra.Migrations
                     b.Navigation("Products");
                 });
 
+            modelBuilder.Entity("CookieShop.Domain.Entities.MediaImage", b =>
+                {
+                    b.Navigation("Products");
+                });
+
             modelBuilder.Entity("CookieShop.Domain.Entities.Order", b =>
                 {
                     b.Navigation("Items");
@@ -627,6 +813,8 @@ namespace CookieShop.Infra.Migrations
             modelBuilder.Entity("CookieShop.Domain.Entities.Product", b =>
                 {
                     b.Navigation("CartItems");
+
+                    b.Navigation("Images");
 
                     b.Navigation("OrderItems");
                 });

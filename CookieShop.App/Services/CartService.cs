@@ -7,7 +7,8 @@ namespace CookieShop.App.Services;
 
 public class CartService(
     ICartRepository cartRepository,
-    IProductRepository productRepository)
+    IProductRepository productRepository,
+    MediaUrlProvider urls)
 {
     public async Task<CartResponse> GetCart(Guid userId)
     {
@@ -18,7 +19,10 @@ public class CartService(
 
     public async Task<CartResponse> AddItem(Guid userId, AddCartItemRequest request)
     {
-        await ValidateProduct(request.ProductId, request.Quantity);
+        var cart = await cartRepository.GetByUserId(userId);
+        var existing = cart?.Items.FirstOrDefault(x => x.ProductId == request.ProductId)?.Quantity ?? 0;
+        await ValidateProduct(request.ProductId, checked(existing + request.Quantity));
+        if (request.Quantity < 1) throw new System.ComponentModel.DataAnnotations.ValidationException("Quantity must be positive.");
         await cartRepository.AddItem(userId, request);
         return await GetCart(userId);
     }
@@ -46,6 +50,7 @@ public class CartService(
 
     private async Task ValidateProduct(Guid productId, int quantity)
     {
+        if (quantity is < 1 or > 1000) throw new System.ComponentModel.DataAnnotations.ValidationException("Quantity must be between 1 and 1000.");
         var product = await productRepository.GetById(productId);
         if (product is null) throw new NotFoundException("Product not found");
 
@@ -57,19 +62,19 @@ public class CartService(
                 $"Insufficient stock for product \"{product.Name}\" (available: {product.StockQuantity}).");
     }
 
-    private static CartResponse ToCartResponse(Cart cart)
+    private CartResponse ToCartResponse(Cart cart)
     {
         var items = cart.Items.Select(ToCartItemResponse).ToList();
         return new CartResponse(cart.Id, items, items.Sum(i => i.LineTotal));
     }
 
-    private static CartItemResponse ToCartItemResponse(CartItem item)
+    private CartItemResponse ToCartItemResponse(CartItem item)
     {
         var unitPrice = item.Product.IsOnSale && item.Product.SalePrice is { } sale ? sale : item.Product.Price;
         return new CartItemResponse(
             item.ProductId,
             item.Product.Name,
-            item.Product.ImageUrl,
+            item.Product.Images.OrderBy(x => x.SortOrder).ThenBy(x => x.ImageId).Select(x => urls.Get(x.ImageId)).FirstOrDefault() ?? item.Product.ImageUrl,
             item.Product.Price,
             unitPrice,
             item.Quantity,

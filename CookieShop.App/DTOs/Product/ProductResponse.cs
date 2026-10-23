@@ -11,4 +11,8 @@ public record ProductResponse(
     int StockQuantity,
     bool IsAvailable,
     Guid CategoryId
-);
+)
+{
+    public string Currency => CookieShop.Domain.Constants.StoreCurrency.Code;
+    public IReadOnlyCollection<CookieShop.App.DTOs.Media.ProductImageResponse> Images { get; init; } = [];
+}

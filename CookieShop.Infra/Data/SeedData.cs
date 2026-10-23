@@ -1,149 +1,37 @@
 using CookieShop.Domain.Constants;
 using CookieShop.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-
 namespace CookieShop.Infra.Data;
 
 public static class SeedData
 {
-    public static async Task Initialize(
-        ILogger<CookieShopDbContext> logger,
-        IServiceProvider serviceProvider,
-        UserManager<ApplicationUser> userManager,
-        RoleManager<IdentityRole<Guid>> roleManager)
+    public static async Task Initialize(ILogger<CookieShopDbContext> logger, IServiceProvider services,
+        UserManager<ApplicationUser> users, RoleManager<IdentityRole<Guid>> roles)
     {
-        using var scope = serviceProvider.CreateScope();
-
-        var context = serviceProvider.GetRequiredService<CookieShopDbContext>();
-
         foreach (var role in UserRole.All)
-        {
-            if (!await roleManager.RoleExistsAsync(role))
-            {
-                await roleManager.CreateAsync(new IdentityRole<Guid>(role));
-                logger.LogInformation("Role created successfully: {RoleName}", role);
-            }
-            else
-            {
-                logger.LogInformation("Role already exists: {RoleName}", role);
-            }
-        }
-
-        var adminEmail = "admin@cookieshop.com";
-        var adminPhone = "09912772092";
-        var adminPassword = "Admin@123";
-
-        var adminUser = await userManager.FindByEmailAsync(adminEmail);
-        if (adminUser == null)
-        {
-            adminUser = new ApplicationUser
-            {
-                Email = adminEmail,
-                UserName = adminPhone,
-                PhoneNumber = adminPhone,
-                EmailConfirmed = true,
-                CreatedAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            var result = await userManager.CreateAsync(adminUser, adminPassword);
-            if (result.Succeeded)
-            {
-                await userManager.AddToRoleAsync(adminUser, UserRole.Admin);
-                logger.LogInformation("Admin created successfully!");
-            }
-            else
-            {
-                throw new Exception("Failed to create admin user: " +
-                                    string.Join(", ", result.Errors.Select(e => e.Description)));
-            }
-        }
-        else
-        {
-            logger.LogInformation("Admin already exists!");
-        }
-
-        if (!await context.Categories.AnyAsync())
-        {
-            var categories = new List<Category>
-            {
-                new() { Name = "Chocolate Chip" },
-                new() { Name = "Oatmeal" },
-                new() { Name = "Classic" },
-                new() { Name = "Filled" }
-            };
-            await context.Categories.AddRangeAsync(categories);
-            await context.SaveChangesAsync();
-            logger.LogInformation("Categories seeded successfully!");
-        }
-
-        if (!await context.Products.AnyAsync())
-        {
-            var categories = await context.Categories.ToDictionaryAsync(c => c.Name);
-
-            var products = new List<Product>
-            {
-                new()
-                {
-                    Name = "Classic Chocolate Chip",
-                    Description = "The timeless favorite — crispy edges, gooey center.",
-                    Price = 5.99m, IsOnSale = true, SalePrice = 4.49m,
-                    ImageUrl = "https://images.example.com/cookies/classic-chocolate-chip.png",
-                    StockQuantity = 50, IsAvailable = true,
-                    CategoryId = categories["Chocolate Chip"].Id
-                },
-                new()
-                {
-                    Name = "Double Chocolate",
-                    Description = "Double the cocoa for the serious chocolate lover.",
-                    Price = 6.49m, IsOnSale = true, SalePrice = 5.49m,
-                    ImageUrl = "https://images.example.com/cookies/double-chocolate.png",
-                    StockQuantity = 40, IsAvailable = true,
-                    CategoryId = categories["Chocolate Chip"].Id
-                },
-                new()
-                {
-                    Name = "Oatmeal Raisin",
-                    Description = "Hearty oats, sweet raisins, a hint of cinnamon.",
-                    Price = 4.99m, IsOnSale = true, SalePrice = 3.99m,
-                    ImageUrl = "https://images.example.com/cookies/oatmeal-raisin.png",
-                    StockQuantity = 35, IsAvailable = true,
-                    CategoryId = categories["Oatmeal"].Id
-                },
-                new()
-                {
-                    Name = "Snickerdoodle",
-                    Description = "Soft and chewy, rolled in cinnamon sugar.",
-                    Price = 4.49m,
-                    ImageUrl = "https://images.example.com/cookies/snickerdoodle.png",
-                    StockQuantity = 45, IsAvailable = true,
-                    CategoryId = categories["Classic"].Id
-                },
-                new()
-                {
-                    Name = "Sugar Cookie",
-                    Description = "Buttery, simple, and perfect with a cup of tea.",
-                    Price = 3.99m,
-                    ImageUrl = "https://images.example.com/cookies/sugar-cookie.png",
-                    StockQuantity = 60, IsAvailable = true,
-                    CategoryId = categories["Classic"].Id
-                },
-                new()
-                {
-                    Name = "Peanut Butter Sandwich",
-                    Description = "Creamy peanut butter filling between two soft cookies.",
-                    Price = 5.49m,
-                    ImageUrl = "https://images.example.com/cookies/peanut-butter-sandwich.png",
-                    StockQuantity = 30, IsAvailable = true,
-                    CategoryId = categories["Filled"].Id
-                }
-            };
-            await context.Products.AddRangeAsync(products);
-            logger.LogInformation("Products seeded successfully!");
-        }
-
-        await context.SaveChangesAsync();
+            if (!await roles.RoleExistsAsync(role)) Ensure(await roles.CreateAsync(new IdentityRole<Guid>(role)));
+        var config = services.GetRequiredService<IConfiguration>();
+        // Bootstrap is explicit and one-time. Never elevate an existing customer account.
+        if (!config.GetValue<bool>("BootstrapAdmin:Enabled")) return;
+        if ((await users.GetUsersInRoleAsync(UserRole.Admin)).Count > 0) return;
+        var phone = config["BootstrapAdmin:PhoneNumber"] ?? throw new InvalidOperationException("Bootstrap admin phone required.");
+        var email = config["BootstrapAdmin:Email"] ?? throw new InvalidOperationException("Bootstrap admin email required.");
+        var password = config["BootstrapAdmin:Password"] ?? throw new InvalidOperationException("Bootstrap admin password required.");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(phone, "^09[0-9]{9}$"))
+            throw new InvalidOperationException("Bootstrap phone must be an Iranian mobile number.");
+        if (await users.FindByNameAsync(phone) != null || await users.FindByEmailAsync(email) != null)
+            throw new InvalidOperationException("Bootstrap identity already exists; provision admin manually.");
+        var user = new ApplicationUser { UserName = phone, PhoneNumber = phone, Email = email };
+        Ensure(await users.CreateAsync(user, password));
+        var assigned = await users.AddToRoleAsync(user, UserRole.Admin);
+        if (!assigned.Succeeded) { Ensure(await users.DeleteAsync(user)); Ensure(assigned); }
+        logger.LogInformation("Owner account created. Disable BootstrapAdmin after provisioning.");
+    }
+    private static void Ensure(IdentityResult result)
+    {
+        if (!result.Succeeded) throw new InvalidOperationException(string.Join("; ", result.Errors.Select(x => x.Description)));
     }
 }
