@@ -151,7 +151,8 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
         if (order is null) return null;
 
         var allowed = (order.Status, newStatus) is
-            (OrderStatus.Pending, OrderStatus.Paid) or
+            (OrderStatus.Pending, OrderStatus.Accepted) or
+            (OrderStatus.Accepted, OrderStatus.Shipped) or
             (OrderStatus.Paid, OrderStatus.Shipped) or
             (OrderStatus.Shipped, OrderStatus.Delivered);
         if (!allowed) throw new ConflictException("Invalid order status transition.");

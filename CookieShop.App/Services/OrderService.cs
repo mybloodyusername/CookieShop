@@ -96,8 +96,9 @@ public class OrderService(
 
         var allowed = (order.Status, newStatus) switch
         {
-            (OrderStatus.Pending, OrderStatus.Paid) => true,
+            (OrderStatus.Pending, OrderStatus.Accepted) => true,
             (OrderStatus.Pending, OrderStatus.Cancelled) => true,
+            (OrderStatus.Accepted, OrderStatus.Shipped) => true,
             (OrderStatus.Paid, OrderStatus.Shipped) => true,
             (OrderStatus.Shipped, OrderStatus.Delivered) => true,
             _ => false
