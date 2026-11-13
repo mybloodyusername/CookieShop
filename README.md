@@ -151,3 +151,15 @@ Terminate HTTPS at a trusted ingress. Configure forwarded headers only for your 
 dotnet restore CookieShop.sln
 dotnet build CookieShop.sln -c Release
 ```
+
+### Customer financial accounts
+
+`GET /api/finance/account` returns the authenticated customer's balance (positive credit, negative debt), debt/credit amounts and ordering-block reason. `GET /api/finance/history?page=1` returns 50 postings per page. Administrators can read the corresponding account and history under `/api/finance/customers/{userId}` and `/history`.
+
+Administrators record received funds with `POST /api/finance/customers/{userId}/payments`, for example `{"amount":500000,"reference":"bank-transfer-123"}`. The reference is unique per customer: retrying the same payment is idempotent; reusing it with another amount is rejected. Payments first cover debt and any remainder becomes available credit. Customers cannot credit themselves through these APIs.
+
+Administrators set terms with `PUT /api/finance/customers/{userId}/terms`, for example `{"debtLimit":5000000,"dueAt":"2026-12-01T00:00:00Z","monthlyDueDay":null}`. Null limits and deadlines disable the respective restriction. Explicit dates are converted to UTC; the client can calculate them using any calendar. Optional recurring `monthlyDueDay` supports days 1–28 in Gregorian UTC. Each accepted charge snapshots its deadline, choosing the earlier of the explicit and next monthly dates. Terms changes apply to future charges. Credits cover the oldest charges first; fully settled older charges do not make new debt overdue.
+
+Order placement checks overdue debt and projected exposure including pending orders. Acceptance checks again and atomically adds the order charge. Shipping/delivery do not require payment. Admin cancellation of an accepted, unshipped order restores stock and posts a cancellation credit; customers may only cancel pending orders. Financial entries are retained for audit. Conflicting concurrent database transactions return HTTP 409 and must be retried after reloading.
+
+Existing orders are **not** automatically charged by these migrations: historical fulfillment does not prove whether payment was received. Reconcile historical balances before enabling credit terms for existing customers. No online gateway is included; administrators record funds actually received.

@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CookieShop.Infra.Repositories;
 
-public class OrderRepository(CookieShopDbContext context) : IOrderRepository
+public class OrderRepository(CookieShopDbContext context, CookieShop.Infra.Services.CustomerFinanceService finance) : IOrderRepository
 {
     public async Task<Order?> GetById(Guid id)
     {
@@ -93,6 +93,9 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
             product.StockQuantity -= item.Quantity;
         }
 
+        var pendingExposure = await context.Orders.Where(x => x.UserId == userId && x.Status == OrderStatus.Pending).SumAsync(x => (decimal?)x.TotalAmount) ?? 0;
+        await finance.EnsureCanOrder(userId, pendingExposure + total);
+
         var order = new Order
         {
             UserId = userId,
@@ -122,7 +125,7 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == id);
         if (order is null) return null;
-        if (order.Status != OrderStatus.Pending) throw new ConflictException("Only pending orders can be cancelled.");
+        if (order.Status is not (OrderStatus.Pending or OrderStatus.Accepted)) throw new ConflictException("Only pending orders can be cancelled.");
 
         var productIds = order.Items.Select(i => i.ProductId).ToList();
         var products = await context.Products
@@ -136,6 +139,8 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
                 product.StockQuantity += item.Quantity;
         }
 
+        if (order.Status == OrderStatus.Accepted && order.TotalAmount > 0)
+            context.FinancialEntries.Add(new FinancialEntry { UserId = order.UserId, OrderId = order.Id, Amount = order.TotalAmount, Kind = "CancellationCredit" });
         order.Status = OrderStatus.Cancelled;
         order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -147,6 +152,7 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
     public async Task<Order?> UpdateStatus(Guid id, OrderStatus newStatus)
     {
         if (newStatus == OrderStatus.Cancelled) return await Cancel(id);
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
         var order = await context.Orders.FirstOrDefaultAsync(o => o.Id == id);
         if (order is null) return null;
 
@@ -156,10 +162,17 @@ public class OrderRepository(CookieShopDbContext context) : IOrderRepository
             (OrderStatus.Paid, OrderStatus.Shipped) or
             (OrderStatus.Shipped, OrderStatus.Delivered);
         if (!allowed) throw new ConflictException("Invalid order status transition.");
+        if (newStatus == OrderStatus.Accepted)
+        {
+            await finance.EnsureCanOrder(order.UserId, order.TotalAmount);
+            if (order.TotalAmount > 0)
+                context.FinancialEntries.Add(new FinancialEntry { UserId = order.UserId, OrderId = order.Id, Amount = -order.TotalAmount, Kind = "OrderCharge", DueAt = await finance.ChargeDueAt(order.UserId) });
+        }
         order.Status = newStatus;
         order.UpdatedAt = DateTimeOffset.UtcNow;
 
         await context.SaveChangesAsync();
+        await transaction.CommitAsync();
         return order;
     }
 }

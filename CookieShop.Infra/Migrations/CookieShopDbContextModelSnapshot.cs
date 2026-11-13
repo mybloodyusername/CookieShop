@@ -216,6 +216,86 @@ namespace CookieShop.Infra.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("CookieShop.Domain.Entities.CustomerPaymentTerms", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("DebtLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTimeOffset?>("DueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("MonthlyDueDay")
+                        .HasColumnType("integer");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("CustomerPaymentTerms", t =>
+                        {
+                            t.HasCheckConstraint("CK_PaymentTerms_Limit", "\"DebtLimit\" IS NULL OR (\"DebtLimit\" >= 0 AND \"DebtLimit\" = trunc(\"DebtLimit\"))");
+                        });
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.FinancialEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RecordedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasFilter("\"Kind\" = 'OrderCharge'");
+
+                    b.HasIndex("UserId", "Reference")
+                        .IsUnique()
+                        .HasFilter("\"Reference\" <> ''");
+
+                    b.ToTable("FinancialEntries", t =>
+                        {
+                            t.HasCheckConstraint("CK_FinancialEntry_Amount", "\"Amount\" <> 0 AND \"Amount\" = trunc(\"Amount\")");
+                        });
+                });
+
             modelBuilder.Entity("CookieShop.Domain.Entities.ImageBlob", b =>
                 {
                     b.Property<Guid>("Id")
@@ -655,6 +735,35 @@ namespace CookieShop.Infra.Migrations
                     b.Navigation("Cart");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.CustomerPaymentTerms", b =>
+                {
+                    b.HasOne("CookieShop.Domain.Entities.ApplicationUser", "User")
+                        .WithOne()
+                        .HasForeignKey("CookieShop.Domain.Entities.CustomerPaymentTerms", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.FinancialEntry", b =>
+                {
+                    b.HasOne("CookieShop.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CookieShop.Domain.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CookieShop.Domain.Entities.ImageBlob", b =>

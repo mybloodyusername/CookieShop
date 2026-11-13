@@ -1,0 +1,33 @@
+@baseUrl = https://localhost:7000
+@token = replace-with-access-token
+@customerId = 00000000-0000-0000-0000-000000000000
+
+### My account
+GET {{baseUrl}}/api/finance/account
+Authorization: Bearer {{token}}
+
+### My statement
+GET {{baseUrl}}/api/finance/history?page=1
+Authorization: Bearer {{token}}
+
+### Admin: customer account
+GET {{baseUrl}}/api/finance/customers/{{customerId}}
+Authorization: Bearer {{token}}
+
+### Admin: customer statement
+GET {{baseUrl}}/api/finance/customers/{{customerId}}/history?page=1
+Authorization: Bearer {{token}}
+
+### Admin: credit terms
+PUT {{baseUrl}}/api/finance/customers/{{customerId}}/terms
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"debtLimit":5000000,"dueAt":"2026-12-01T00:00:00Z","monthlyDueDay":null}
+
+### Admin: record funds received (retry-safe reference)
+POST {{baseUrl}}/api/finance/customers/{{customerId}}/payments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"amount":500000,"reference":"bank-transfer-123"}

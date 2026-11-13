@@ -99,6 +99,7 @@ public class OrderService(
             (OrderStatus.Pending, OrderStatus.Accepted) => true,
             (OrderStatus.Pending, OrderStatus.Cancelled) => true,
             (OrderStatus.Accepted, OrderStatus.Shipped) => true,
+            (OrderStatus.Accepted, OrderStatus.Cancelled) => true,
             (OrderStatus.Paid, OrderStatus.Shipped) => true,
             (OrderStatus.Shipped, OrderStatus.Delivered) => true,
             _ => false
