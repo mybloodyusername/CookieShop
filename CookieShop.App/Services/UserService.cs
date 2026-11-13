@@ -12,6 +12,12 @@ namespace CookieShop.App.Services;
 
 public class UserService(IUserRepository userRepository, UserManager<ApplicationUser> userManager)
 {
+    public async Task<bool> IsPhoneNumberAvailable(string phoneNumber) =>
+        await userRepository.GetByPhoneNumber(phoneNumber) == null;
+
+    public async Task<bool> IsEmailAvailable(string email) =>
+        await userManager.FindByEmailAsync(email) == null;
+
     public async Task<PagedResult<UserResponse>> GetAll(int page, int pageSize)
     {
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);

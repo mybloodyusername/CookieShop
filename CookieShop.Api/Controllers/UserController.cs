@@ -4,28 +4,28 @@ using CookieShop.App.Services;
 using CookieShop.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace CookieShop.Api.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UserController(UserService userService, AuthService authService) : ControllerBase
+    public class UserController(UserService userService) : ControllerBase
     {
-        [Authorize(Roles = UserRole.Customer)]
-        [HttpPut("Update")]
-        public async Task<ActionResult<UserResponse>> Update([FromBody] UpdateUserRequest request)
+        /// <summary>Checks whether a phone number can be used for a new account.</summary>
+        [HttpGet("PhoneNumberAvailability")]
+        public async Task<ActionResult<AvailabilityResponse>> PhoneNumberAvailability(
+            [FromQuery, Required, RegularExpression(@"^09[0-9]{9}$")] string phoneNumber)
         {
-            var userId = User.GetUserId();
-            var result = await userService.Update(userId, request);
-            return Ok(result);
+            return Ok(new AvailabilityResponse(await userService.IsPhoneNumberAvailable(phoneNumber)));
         }
 
-        [Authorize(Roles = UserRole.Customer)]
-        [HttpPost("ChangePassword")]
-        public async Task<ActionResult> ChangePassword([FromBody] CookieShop.App.DTOs.Auth.ChangePasswordRequest request)
+        /// <summary>Checks whether an email address can be used for a new account.</summary>
+        [HttpGet("EmailAvailability")]
+        public async Task<ActionResult<AvailabilityResponse>> EmailAvailability(
+            [FromQuery, Required, EmailAddress, MaxLength(256)] string email)
         {
-            await authService.ChangePassword(User.GetUserId(), request);
-            return NoContent();
+            return Ok(new AvailabilityResponse(await userService.IsEmailAvailable(email)));
         }
 
         [Authorize]

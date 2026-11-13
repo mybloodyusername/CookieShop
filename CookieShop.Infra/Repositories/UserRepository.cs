@@ -64,6 +64,9 @@ public class UserRepository(
 
         if (await context.Users.AnyAsync(x => x.Id != request.Id && x.PhoneNumber == request.PhoneNumber))
             throw new DuplicateException("Phone number already exists.");
+        var existingEmail = await userManager.FindByEmailAsync(request.Email);
+        if (existingEmail != null && existingEmail.Id != request.Id)
+            throw new DuplicateException("Email already exists.");
         existingUser.PhoneNumberConfirmed = existingUser.PhoneNumber == request.PhoneNumber && existingUser.PhoneNumberConfirmed;
         existingUser.EmailConfirmed = existingUser.Email == request.Email && existingUser.EmailConfirmed;
         existingUser.UserName = request.PhoneNumber;
