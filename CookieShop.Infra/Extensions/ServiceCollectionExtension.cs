@@ -114,7 +114,7 @@ public static class ServiceCollectionExtension
             {
                 options.AddPolicy("DevelopmentPolicy", policy =>
                 {
-                    policy.WithOrigins(corsSettings.GetSection("DevelopmentOrigin").Value!)
+                    policy.WithOrigins(corsSettings.GetSection("DevelopmentOrigins").Get<string[]>() ?? [])
                         .AllowAnyMethod()
                         .AllowAnyHeader()
                         .AllowCredentials();

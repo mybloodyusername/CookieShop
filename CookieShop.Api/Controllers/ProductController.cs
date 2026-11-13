@@ -16,6 +16,8 @@ namespace CookieShop.Api.Controllers
         public async Task<ActionResult<PagedResult<ProductResponse>>> GetAll(
             Guid? categoryId, string? search, int page = 1, int pageSize = 10)
         {
+            // TODO: remove
+            await Task.Delay(1000);
             var result = await productService.GetAll(categoryId, search, page, pageSize);
             return Ok(result);
         }
@@ -24,6 +26,8 @@ namespace CookieShop.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<ProductDetailResponse>> GetById(Guid id)
         {
+            // TODO: remove
+            await Task.Delay(1000);
             var result = await productService.GetById(id);
             return Ok(result);
         }
