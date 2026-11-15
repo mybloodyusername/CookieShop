@@ -121,7 +121,7 @@ public class OrderService(
         order.TotalAmount,
         order.Note,
         order.CreatedAt,
-        order.UpdatedAt) { PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
+        order.UpdatedAt) { OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
 
     private static OrderDetailResponse ToDetail(Order order) => new(
         order.Id,
@@ -132,7 +132,7 @@ public class OrderService(
         order.CreatedAt,
         order.UpdatedAt,
         new AddressResponse(order.AddressId, order.ShippingTitle, order.ShippingAddressLine1, order.ShippingAddressLine2, order.ShippingPhoneNumber, order.UserId),
-        order.Items.Select(ToItemResponse).ToList()) { PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
+        order.Items.Select(ToItemResponse).ToList()) { OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
 
     private static OrderItemResponse ToItemResponse(OrderItem item) => new(
         item.ProductId,

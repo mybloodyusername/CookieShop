@@ -1,5 +1,6 @@
 using CookieShop.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace CookieShop.Infra.Configurations;
@@ -12,6 +13,10 @@ public class OrderConfig : IEntityTypeConfiguration<Order>
         {
             t.HasCheckConstraint("CK_Order_Total", "\"TotalAmount\" >= 0 AND \"TotalAmount\" = trunc(\"TotalAmount\")");
         });
+        builder.Property(e => e.OrderNumber).IsRequired().HasMaxLength(15)
+            .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Throw);
+        builder.HasIndex(e => e.OrderNumber).IsUnique();
+        builder.ToTable(t => t.HasCheckConstraint("CK_Order_Number", "\"OrderNumber\" ~ '^[0-9]{8}-[0-9]{6}$'"));
         builder.Property<uint>("Version").IsRowVersion();
         builder.Property(e => e.TotalAmount).HasPrecision(18, 2);
         builder.Property(e => e.PaidAmount).HasPrecision(18, 2);

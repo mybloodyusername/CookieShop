@@ -30,12 +30,19 @@ static class MigrationChecks
             (gen_random_uuid(),{user},{charged},-500,'OrderCharge','',now()),
             (gen_random_uuid(),{user},NULL,200,'Payment','legacy-receipt',now());
             """);
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE "Orders" SET "CreatedAt" = '2026-03-20 20:30:00+00' WHERE "Id" = {paid};
+            """);
         try { await db.Database.MigrateAsync(); throw new Exception("Ambiguous legacy fulfilment was accepted."); }
         catch (PostgresException e) when (e.MessageText.StartsWith("Reconcile legacy fulfilled"))
         { Console.WriteLine("PASS Migration refuses ambiguous historical fulfilment"); }
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM \"Orders\" WHERE \"Id\" = {ambiguous}");
         await db.Database.MigrateAsync();
         var orders = await db.Orders.AsNoTracking().Where(x => x.UserId == user).ToDictionaryAsync(x => x.Id);
+        if (!orders[paid].OrderNumber.StartsWith("14050101-") || orders.Values.Any(x => x.OrderNumber.Length != 15) ||
+            orders.Values.Select(x => x.OrderNumber).Distinct().Count() != orders.Count)
+            throw new Exception("Historical order numbers were not backfilled correctly.");
+        Console.WriteLine("PASS Migration backfills unique Persian-date order numbers at Tehran Nowruz midnight");
         if (orders[charged].PaidAmount != 200 || orders[charged].PaymentStatus != PaymentStatus.PartiallyPaid || !orders[charged].PayLater)
             throw new Exception("Legacy funds were not allocated to the charged order.");
         Console.WriteLine("PASS Migration allocates legacy pooled funds to charged orders");

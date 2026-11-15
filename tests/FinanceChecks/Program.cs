@@ -13,7 +13,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 var connection = Environment.GetEnvironmentVariable("FINANCE_TEST_DATABASE") ?? throw new Exception("Set FINANCE_TEST_DATABASE to an isolated PostgreSQL database.");
-await using var db = new CookieShopDbContext(new DbContextOptionsBuilder<CookieShopDbContext>().UseNpgsql(connection).Options);
+var numberCollision = new OrderNumberCollisionInterceptor();
+await using var db = new CookieShopDbContext(new DbContextOptionsBuilder<CookieShopDbContext>().UseNpgsql(connection).AddInterceptors(numberCollision).Options);
 if (args.Contains("--migration")) await MigrationChecks.Run(db);
 await db.Database.MigrateAsync();
 var customerRole = await Role(UserRole.Customer);
@@ -63,6 +64,28 @@ var user = await Customer();
 Check(!(await finance.GetAccount(user)).AllowPayLater, "Pay later is disabled by default");
 await Reject(async () => await Place(await Customer(), later: true), "Customer cannot opt into pay later");
 var order = await Place(user);
+Check(System.Text.RegularExpressions.Regex.IsMatch(order.OrderNumber, @"^[0-9]{8}-[0-9]{6}$"), "Checkout assigns a fixed-width order number");
+var numberOwner = await Customer();
+await Fund(numberOwner, 500);
+numberCollision.DuplicateNumber = order.OrderNumber;
+var collisionOrder = await Place(numberOwner);
+Check(numberCollision.Attempts == 2 && collisionOrder.OrderNumber != order.OrderNumber,
+    "Unique-index collision retries with a new order number");
+Check(collisionOrder.PaidAmount == 500 && (await finance.GetAccount(numberOwner)).Credit == 0 &&
+    await db.OrderPayments.CountAsync(x => x.OrderId == collisionOrder.Id) == 1,
+    "Collision retry charges the wallet exactly once");
+Check(await db.Products.Where(x => x.Id == collisionOrder.Items.First().ProductId).Select(x => x.StockQuantity).SingleAsync() == 9 &&
+    !await db.CartItems.AnyAsync(x => x.Cart.UserId == numberOwner),
+    "Collision retry reserves stock once and clears the cart");
+OrderNumberChecks.Run(Check);
+await using (var immutableDb = new CookieShopDbContext(new DbContextOptionsBuilder<CookieShopDbContext>().UseNpgsql(connection).Options))
+{
+    var savedOrder = await immutableDb.Orders.SingleAsync(x => x.Id == order.Id);
+    savedOrder.OrderNumber = "14050101-000000";
+    try { await immutableDb.SaveChangesAsync(); throw new Exception("Saved order number was editable."); }
+    catch (InvalidOperationException e) when (e.Message.Contains("OrderNumber"))
+    { Check(true, "Saved order numbers cannot be changed through EF"); }
+}
 Check(order.Status == OrderStatus.Pending && order.PaymentStatus == PaymentStatus.Unpaid, "Pending unpaid checkout does not create debt");
 Check((await finance.GetAccount(user)).Debt == 0, "Unpaid checkout is not account debt");
 await Reject(() => repository.UpdateStatus(order.Id, OrderStatus.Accepted), "Prepaid order cannot be accepted unpaid");

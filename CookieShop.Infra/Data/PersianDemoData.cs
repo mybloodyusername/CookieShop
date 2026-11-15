@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using CookieShop.Domain.Constants;
+using CookieShop.Infra.Services;
 using CookieShop.Domain.Entities;
 using CookieShop.Domain.Enums;
 using Microsoft.AspNetCore.Identity;
@@ -183,7 +184,8 @@ public static class PersianDemoData
             var created = now.AddDays(-draft.DaysAgo).AddHours(-6);
             var order = new Order
             {
-                Id = Guid.NewGuid(), UserId = ownerId, Address = address, Status = draft.Status, Note = draft.Note,
+                Id = Guid.NewGuid(), OrderNumber = OrderNumberGenerator.Generate(created),
+                UserId = ownerId, Address = address, Status = draft.Status, Note = draft.Note,
                 ShippingTitle = address.Title, ShippingAddressLine1 = address.AddressLine1,
                 ShippingAddressLine2 = address.AddressLine2, ShippingPhoneNumber = address.PhoneNumber,
                 CreatedAt = created, UpdatedAt = draft.Status == OrderStatus.Pending ? created : created.AddHours(2)

@@ -1,4 +1,5 @@
 using System.Data;
+using Npgsql;
 using CookieShop.App.DTOs.Common;
 using CookieShop.App.Exceptions;
 using CookieShop.App.Interfaces.Repositories;
@@ -48,6 +49,25 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
     }
 
     public async Task<Order> PlaceOrder(Guid userId, Guid addressId, string? note, bool payLater = false)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await PlaceOrderOnce(userId, addressId, note, payLater);
+            }
+            catch (Exception e) when (attempt < 3 &&
+                (e is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure } ||
+                 e is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.SerializationFailure } }))
+            {
+                // A concurrent insert can surface as a serialization failure rather
+                // than a unique violation. Restart from a fresh snapshot after rollback.
+                context.ChangeTracker.Clear();
+            }
+        }
+    }
+
+    private async Task<Order> PlaceOrderOnce(Guid userId, Guid addressId, string? note, bool payLater)
     {
         await using var transaction =
             await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -118,13 +138,29 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             Note = note,
             Items = orderItems,
         };
+        order.OrderNumber = OrderNumberGenerator.Generate(order.CreatedAt);
         await context.Orders.AddAsync(order);
 
         await finance.PayFromWallet(order);
         CustomerFinanceService.RefreshPaymentStatus(order);
         context.CartItems.RemoveRange(cart.Items);
 
-        await context.SaveChangesAsync();
+        // EF rolls failed saves back to its transaction savepoint, including stock,
+        // wallet and cart changes. Retry only the order-number unique violation.
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                await context.SaveChangesAsync();
+                break;
+            }
+            catch (DbUpdateException e) when (attempt < 20 &&
+                e.InnerException is PostgresException
+                { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "IX_Orders_OrderNumber" })
+            {
+                order.OrderNumber = OrderNumberGenerator.Generate(order.CreatedAt);
+            }
+        }
         await transaction.CommitAsync();
         return order;
     }

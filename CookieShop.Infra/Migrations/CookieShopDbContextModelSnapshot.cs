@@ -385,6 +385,11 @@ namespace CookieShop.Infra.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("character varying(15)");
+
                     b.Property<decimal>("PaidAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -442,10 +447,15 @@ namespace CookieShop.Infra.Migrations
 
                     b.HasIndex("AddressId");
 
+                    b.HasIndex("OrderNumber")
+                        .IsUnique();
+
                     b.HasIndex("UserId");
 
                     b.ToTable("Orders", t =>
                         {
+                            t.HasCheckConstraint("CK_Order_Number", "\"OrderNumber\" ~ '^[0-9]{8}-[0-9]{6}$'");
+
                             t.HasCheckConstraint("CK_Order_PaidAmount", "\"PaidAmount\" >= 0 AND \"PaidAmount\" <= \"TotalAmount\" AND \"PaidAmount\" = trunc(\"PaidAmount\")");
 
                             t.HasCheckConstraint("CK_Order_Total", "\"TotalAmount\" >= 0 AND \"TotalAmount\" = trunc(\"TotalAmount\")");
