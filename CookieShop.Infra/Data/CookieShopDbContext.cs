@@ -16,6 +16,8 @@ public class CookieShopDbContext(DbContextOptions<CookieShopDbContext> options)
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<CustomerPaymentTerms> CustomerPaymentTerms => Set<CustomerPaymentTerms>();
     public DbSet<FinancialEntry> FinancialEntries => Set<FinancialEntry>();
+    public DbSet<OrderPayment> OrderPayments => Set<OrderPayment>();
+    public DbSet<PaymentAttempt> PaymentAttempts => Set<PaymentAttempt>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
     public DbSet<MediaImage> MediaImages => Set<MediaImage>();

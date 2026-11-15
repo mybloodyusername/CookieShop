@@ -40,7 +40,7 @@ namespace CookieShop.Api.Controllers
         }
 
         /// <summary>Updates the authenticated customer's name. Email and phone are administrator-only fields.</summary>
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpPut("Me")]
         public async Task<ActionResult<UserResponse>> UpdateMe([FromBody] UpdateMyProfileRequest request)
         {

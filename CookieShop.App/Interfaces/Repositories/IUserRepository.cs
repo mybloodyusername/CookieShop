@@ -5,6 +5,7 @@ namespace CookieShop.App.Interfaces.Repositories;
 
 public interface IUserRepository
 {
+    Task<IReadOnlyDictionary<Guid, string>> GetRoles(IReadOnlyCollection<Guid> userIds);
     public Task<ApplicationUser?> GetById(Guid userId);
     public Task<ApplicationUser?> GetByPhoneNumber(string username);
     public Task<ApplicationUser> Create(CreateUserRequest request);

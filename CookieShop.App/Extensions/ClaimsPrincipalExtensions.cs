@@ -15,6 +15,7 @@ public static class ClaimsPrincipalExtensions
 
     public static string GetRole(this ClaimsPrincipal principal)
     {
+        if (principal.IsInRole(CookieShop.Domain.Constants.UserRole.Admin)) return CookieShop.Domain.Constants.UserRole.Admin;
         var value = principal.FindFirstValue(ClaimTypes.Role);
         return value ?? throw new UnauthorizedAccessException("Invalid user name in token.");
     }

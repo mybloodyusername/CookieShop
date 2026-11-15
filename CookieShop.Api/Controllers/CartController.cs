@@ -11,7 +11,7 @@ namespace CookieShop.Api.Controllers
     [ApiController]
     public class CartController(CartService cartService) : ControllerBase
     {
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpGet]
         public async Task<ActionResult<CartResponse>> Get()
         {
@@ -20,7 +20,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpPost("AddItem")]
         public async Task<ActionResult<CartResponse>> AddItem([FromBody] AddCartItemRequest request)
         {
@@ -29,7 +29,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpPut("UpdateItem")]
         public async Task<ActionResult<CartResponse>> UpdateItem([FromBody] UpdateCartItemRequest request)
         {
@@ -38,7 +38,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpDelete("RemoveItem/{productId}")]
         public async Task<ActionResult<CartResponse>> RemoveItem(Guid productId)
         {
@@ -47,7 +47,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpDelete("Clear")]
         public async Task<ActionResult<CartResponse>> Clear()
         {

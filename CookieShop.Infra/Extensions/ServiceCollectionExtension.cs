@@ -53,8 +53,12 @@ public static class ServiceCollectionExtension
                 throw new InvalidOperationException("JWT issuer and audience are required.");
             var minutes = jwtSettings.GetValue<int>("ExpirationMinutes");
             if (minutes is < 5 or > 120) throw new InvalidOperationException("JWT expiration must be between 5 and 120 minutes.");
-            services.AddAuthorization(options => options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-                .RequireAuthenticatedUser().Build());
+            services.AddAuthorization(options =>
+            {
+                options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+                options.AddPolicy("CustomerOnly", policy => policy.RequireAuthenticatedUser().RequireRole(UserRole.Customer)
+                    .RequireAssertion(context => !context.User.IsInRole(UserRole.Admin)));
+            });
 
             services.AddAuthentication(options =>
                 {

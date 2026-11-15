@@ -47,7 +47,7 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         return new PagedResult<Order>(items, totalCount, page, pageSize);
     }
 
-    public async Task<Order> PlaceOrder(Guid userId, Guid addressId, string? note)
+    public async Task<Order> PlaceOrder(Guid userId, Guid addressId, string? note, bool payLater = false)
     {
         await using var transaction =
             await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -99,9 +99,10 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             product.StockQuantity -= item.Quantity;
         }
 
-        var pendingExposure = await context.Orders.Where(x => x.UserId == userId && x.Status == OrderStatus.Pending)
-            .SumAsync(x => (decimal?)x.TotalAmount) ?? 0;
-        await finance.EnsureCanOrder(userId, pendingExposure + total);
+        await finance.EnsureCustomer(userId);
+        var pendingExposure = await context.Orders.Where(x => x.UserId == userId && x.Status == OrderStatus.Pending && x.PayLater)
+            .SumAsync(x => (decimal?)(x.TotalAmount - x.PaidAmount)) ?? 0;
+        if (payLater) await finance.EnsureCanOrder(userId, pendingExposure + total);
 
         var order = new Order
         {
@@ -112,12 +113,15 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             ShippingAddressLine2 = address.AddressLine2,
             ShippingPhoneNumber = address.PhoneNumber,
             Status = OrderStatus.Pending,
+            PayLater = payLater,
             TotalAmount = total,
             Note = note,
             Items = orderItems,
         };
         await context.Orders.AddAsync(order);
 
+        await finance.PayFromWallet(order);
+        CustomerFinanceService.RefreshPaymentStatus(order);
         context.CartItems.RemoveRange(cart.Items);
 
         await context.SaveChangesAsync();
@@ -125,7 +129,9 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         return order;
     }
 
-    public async Task<Order?> Cancel(Guid id)
+    public async Task<Order?> Cancel(Guid id) => await CancelOrReject(id, OrderStatus.Cancelled, allowAccepted: false);
+
+    private async Task<Order?> CancelOrReject(Guid id, OrderStatus terminalStatus, bool allowAccepted = true)
     {
         await using var transaction =
             await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -133,7 +139,10 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == id);
         if (order is null) return null;
-        if (order.Status is not (OrderStatus.Pending or OrderStatus.Accepted))
+        if (order.Status == terminalStatus) return order;
+        if (terminalStatus == OrderStatus.Rejected && order.Status != OrderStatus.Pending)
+            throw new ConflictException("Only pending orders can be rejected.");
+        if (order.Status != OrderStatus.Pending && !(allowAccepted && order.Status == OrderStatus.Accepted))
             throw new ConflictException("Only pending orders can be cancelled.");
 
         var productIds = order.Items.Select(i => i.ProductId).ToList();
@@ -148,10 +157,20 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
                 product.StockQuantity += item.Quantity;
         }
 
-        if (order.Status == OrderStatus.Accepted && order.TotalAmount > 0)
-            context.FinancialEntries.Add(new FinancialEntry
-                { UserId = order.UserId, OrderId = order.Id, Amount = order.TotalAmount, Kind = "CancellationCredit" });
-        order.Status = OrderStatus.Cancelled;
+        // Reverse exactly what was charged: funded money for pending orders, full charge for accepted ones.
+        var charged = -(await context.FinancialEntries.Where(x => x.OrderId == id &&
+            (x.Kind == "OrderCharge" || x.Kind == "OrderPrepayment")).SumAsync(x => (decimal?)x.Amount) ?? 0);
+        if (charged > 0)
+        {
+            var credit = new FinancialEntry { UserId = order.UserId, OrderId = order.Id,
+                Amount = charged, Kind = "CancellationCredit" };
+            context.FinancialEntries.Add(credit);
+            order.Status = terminalStatus;
+            // Any returned credit first settles other accepted debt; the rest remains in the wallet.
+            await finance.AllocateDebtPayment(order.UserId, Math.Min(charged, order.PaidAmount), credit);
+        }
+        order.Status = terminalStatus;
+        CustomerFinanceService.RefreshPaymentStatus(order);
         order.UpdatedAt = DateTimeOffset.UtcNow;
 
         await context.SaveChangesAsync();
@@ -161,7 +180,7 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
 
     public async Task<Order?> UpdateStatus(Guid id, OrderStatus newStatus)
     {
-        if (newStatus == OrderStatus.Cancelled) return await Cancel(id);
+        if (newStatus is OrderStatus.Cancelled or OrderStatus.Rejected) return await CancelOrReject(id, newStatus);
         await using var transaction =
             await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var order = await context.Orders.FirstOrDefaultAsync(o => o.Id == id);
@@ -170,16 +189,24 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         var allowed = (order.Status, newStatus) is
             (OrderStatus.Pending, OrderStatus.Accepted) or
             (OrderStatus.Accepted, OrderStatus.Shipped) or
-            (OrderStatus.Paid, OrderStatus.Shipped) or
             (OrderStatus.Shipped, OrderStatus.Delivered);
         if (!allowed) throw new ConflictException("Invalid order status transition.");
         if (newStatus == OrderStatus.Accepted)
         {
-            await finance.EnsureCanOrder(order.UserId, order.TotalAmount);
-            if (order.TotalAmount > 0)
+            await finance.PayFromWallet(order);
+            await context.SaveChangesAsync();
+            var outstanding = order.TotalAmount - order.PaidAmount;
+            if (outstanding > 0)
+            {
+                if (!order.PayLater) throw new ConflictException("Payment is required before accepting this order.");
+                var reserved = await context.Orders.Where(x => x.UserId == order.UserId && x.Id != order.Id && x.PayLater && x.Status == OrderStatus.Pending)
+                    .SumAsync(x => (decimal?)(x.TotalAmount - x.PaidAmount)) ?? 0;
+                await finance.EnsureCanOrder(order.UserId, reserved + outstanding);
+            }
+            if (outstanding > 0)
                 context.FinancialEntries.Add(new FinancialEntry
                 {
-                    UserId = order.UserId, OrderId = order.Id, Amount = -order.TotalAmount, Kind = "OrderCharge",
+                    UserId = order.UserId, OrderId = order.Id, Amount = -outstanding, Kind = "OrderCharge",
                     DueAt = await finance.ChargeDueAt(order.UserId)
                 });
         }

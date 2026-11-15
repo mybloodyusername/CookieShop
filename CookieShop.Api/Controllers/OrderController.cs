@@ -13,7 +13,7 @@ namespace CookieShop.Api.Controllers
     [ApiController]
     public class OrderController(OrderService orderService) : ControllerBase
     {
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpPost("Create")]
         public async Task<ActionResult<OrderDetailResponse>> Create([FromBody] CreateOrderRequest request)
         {
@@ -22,7 +22,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpGet]
         public async Task<ActionResult<IReadOnlyCollection<OrderResponse>>> GetMyOrders()
         {
@@ -31,7 +31,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpGet("GetById/{id}")]
         public async Task<ActionResult<OrderDetailResponse>> GetById(Guid id)
         {
@@ -40,7 +40,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpPut("Cancel/{id}")]
         public async Task<ActionResult<OrderResponse>> Cancel(Guid id)
         {

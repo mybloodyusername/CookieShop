@@ -23,6 +23,11 @@ public class Order
     /// <summary>Whole Iranian toman (IRT), without fractional units.</summary>
     public decimal TotalAmount { get; set; }
 
+    // Snapshotted at checkout; customers cannot opt themselves into credit.
+    public bool PayLater { get; set; }
+    public decimal PaidAmount { get; set; }
+    public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
+
     [MaxLength(256)] public string? Note { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

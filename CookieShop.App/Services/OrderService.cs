@@ -26,7 +26,7 @@ public class OrderService(
 
         try
         {
-            var order = await orderRepository.PlaceOrder(userId, request.AddressId, request.Note);
+            var order = await orderRepository.PlaceOrder(userId, request.AddressId, request.Note, request.PayLater);
             var detail = await orderRepository.GetById(order.Id);
             if (detail is null) throw new NotFoundException("Order not found");
             return ToDetail(detail);
@@ -77,6 +77,7 @@ public class OrderService(
         var order = await orderRepository.GetById(orderId);
         if (order is null) throw new NotFoundException("Order not found");
         if (order.UserId != userId) throw new UnauthorizedAccessException();
+        if (order.Status == OrderStatus.Cancelled) return ToResponse(order);
         if (order.Status != OrderStatus.Pending)
             throw new ConflictException("Only pending orders can be cancelled.");
 
@@ -94,13 +95,14 @@ public class OrderService(
         var order = await orderRepository.GetById(request.OrderId);
         if (order is null) throw new NotFoundException("Order not found");
 
+        if (order.Status == newStatus && newStatus is OrderStatus.Cancelled or OrderStatus.Rejected) return ToResponse(order);
         var allowed = (order.Status, newStatus) switch
         {
             (OrderStatus.Pending, OrderStatus.Accepted) => true,
             (OrderStatus.Pending, OrderStatus.Cancelled) => true,
+            (OrderStatus.Pending, OrderStatus.Rejected) => true,
             (OrderStatus.Accepted, OrderStatus.Shipped) => true,
             (OrderStatus.Accepted, OrderStatus.Cancelled) => true,
-            (OrderStatus.Paid, OrderStatus.Shipped) => true,
             (OrderStatus.Shipped, OrderStatus.Delivered) => true,
             _ => false
         };
@@ -119,7 +121,7 @@ public class OrderService(
         order.TotalAmount,
         order.Note,
         order.CreatedAt,
-        order.UpdatedAt);
+        order.UpdatedAt) { PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
 
     private static OrderDetailResponse ToDetail(Order order) => new(
         order.Id,
@@ -130,7 +132,7 @@ public class OrderService(
         order.CreatedAt,
         order.UpdatedAt,
         new AddressResponse(order.AddressId, order.ShippingTitle, order.ShippingAddressLine1, order.ShippingAddressLine2, order.ShippingPhoneNumber, order.UserId),
-        order.Items.Select(ToItemResponse).ToList());
+        order.Items.Select(ToItemResponse).ToList()) { PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
 
     private static OrderItemResponse ToItemResponse(OrderItem item) => new(
         item.ProductId,

@@ -2,6 +2,7 @@ using CookieShop.App.DTOs.Finance;
 using CookieShop.App.Exceptions;
 using CookieShop.Domain.Constants;
 using CookieShop.Domain.Entities;
+using CookieShop.Domain.Enums;
 using CookieShop.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
@@ -10,21 +11,17 @@ public class CustomerFinanceService(CookieShopDbContext context)
 {
     public async Task<AccountResponse> GetAccount(Guid userId, CancellationToken ct = default)
     {
-        if (!await context.Users.AnyAsync(x => x.Id == userId, ct)) throw new NotFoundException("Customer not found.");
+        await EnsureCustomer(userId, ct);
         var balance = await context.FinancialEntries.Where(x => x.UserId == userId).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
         var terms = await context.CustomerPaymentTerms.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, ct);
-        var entries = await context.FinancialEntries.AsNoTracking().Where(x => x.UserId == userId).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToListAsync(ct);
-        var credits = entries.Where(x => x.Amount > 0).Sum(x => x.Amount);
-        var overdue = false;
-        foreach (var charge in entries.Where(x => x.Amount < 0))
-        {
-            var applied = Math.Min(credits, -charge.Amount);
-            credits -= applied;
-            if (-charge.Amount > applied && charge.DueAt <= DateTimeOffset.UtcNow) overdue = true;
-        }
+        var overdue = await (from charge in context.FinancialEntries
+            join order in context.Orders on charge.OrderId equals order.Id
+            where order.UserId == userId && order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Rejected
+                && order.PaidAmount < order.TotalAmount && charge.Kind == "OrderCharge" && charge.DueAt <= DateTimeOffset.UtcNow
+            select charge.Id).AnyAsync(ct);
         var reason = overdue ? "OVERDUE_DEBT: Please pay your overdue debt before placing another order."
             : terms?.DebtLimit is {} limit && -balance >= limit && balance < 0 ? "DEBT_LIMIT_REACHED: Please pay your debt before placing another order." : null;
-        return new(balance, Math.Max(0, -balance), Math.Max(0, balance), terms?.DebtLimit, terms?.DueAt, reason);
+        return new(balance, Math.Max(0, -balance), Math.Max(0, balance), terms?.DebtLimit, terms?.DueAt, reason, terms?.AllowPayLater == true);
     }
     public async Task<DateTimeOffset?> ChargeDueAt(Guid userId)
     {
@@ -42,6 +39,7 @@ public class CustomerFinanceService(CookieShopDbContext context)
     public async Task EnsureCanOrder(Guid userId, decimal additionalExposure, CancellationToken ct = default)
     {
         var account = await GetAccount(userId, ct);
+        if (!account.AllowPayLater) throw new ConflictException("PAY_LATER_DISABLED: Pay later is not enabled for this customer.");
         if (account.OrderingBlockReason is {} reason) throw new ConflictException(reason);
         if (account.DebtLimit is {} limit && additionalExposure - account.Balance > limit)
             throw new ConflictException("DEBT_LIMIT_EXCEEDED: This order would exceed your debt limit. Please add funds or pay your debt.");
@@ -61,6 +59,7 @@ public class CustomerFinanceService(CookieShopDbContext context)
         await GetAccount(userId, ct);
         var terms = await context.CustomerPaymentTerms.SingleOrDefaultAsync(x => x.UserId == userId, ct);
         if (terms is null) { terms = new() { UserId = userId }; context.CustomerPaymentTerms.Add(terms); }
+        terms.AllowPayLater = request.AllowPayLater;
         terms.MonthlyDueDay = request.MonthlyDueDay;
         terms.DebtLimit = request.DebtLimit;
         terms.DueAt = request.DueAt?.ToUniversalTime();
@@ -82,10 +81,69 @@ public class CustomerFinanceService(CookieShopDbContext context)
         }
         else
         {
-            context.FinancialEntries.Add(new() { UserId = userId, Amount = request.Amount, Kind = "Payment", Reference = reference, RecordedBy = adminId });
+            var entry = new FinancialEntry { UserId = userId, Amount = request.Amount, Kind = "Payment", Reference = reference, RecordedBy = adminId };
+            context.FinancialEntries.Add(entry);
+            await AllocateDebtPayment(userId, request.Amount, entry, ct);
             await context.SaveChangesAsync(ct);
         }
         await tx.CommitAsync(ct);
         return await GetAccount(userId, ct);
     }
+    public async Task EnsureCustomer(Guid userId, CancellationToken ct = default)
+    {
+        var roles = await (from membership in context.UserRoles
+            join role in context.Roles on membership.RoleId equals role.Id
+            where membership.UserId == userId select role.Name).ToListAsync(ct);
+        if (!roles.Contains(UserRole.Customer) || roles.Contains(UserRole.Admin))
+            throw new NotFoundException("Customer not found.");
+    }
+
+    // Caller owns the serializable transaction. Payments settle accepted debt oldest first.
+    public async Task AllocateDebtPayment(Guid userId, decimal available, FinancialEntry source, CancellationToken ct = default)
+    {
+        var orders = await context.Orders.Where(x => x.UserId == userId &&
+                (x.Status == OrderStatus.Accepted || x.Status == OrderStatus.Shipped || x.Status == OrderStatus.Delivered)
+                && x.PaidAmount < x.TotalAmount)
+            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToListAsync(ct);
+        foreach (var order in orders)
+        {
+            if (available <= 0) break;
+            if (order.Status is OrderStatus.Cancelled or OrderStatus.Rejected) continue;
+            var amount = Math.Min(available, order.TotalAmount - order.PaidAmount);
+            if (amount <= 0) continue;
+            Allocate(order, amount, source, "DebtPayment");
+            available -= amount;
+        }
+    }
+
+    public void Allocate(Order order, decimal amount, FinancialEntry? source, string kind)
+    {
+        if (amount <= 0 || amount > order.TotalAmount - order.PaidAmount)
+            throw new ConflictException("Invalid payment allocation.");
+        context.OrderPayments.Add(new() { Order = order, Amount = amount, FinancialEntry = source, Source = kind });
+        order.PaidAmount += amount;
+        RefreshPaymentStatus(order);
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    public static void RefreshPaymentStatus(Order order) => order.PaymentStatus =
+        order.Status is OrderStatus.Cancelled or OrderStatus.Rejected && order.PaidAmount > 0 ? PaymentStatus.Refunded :
+        order.PaidAmount >= order.TotalAmount ? PaymentStatus.Paid :
+        order.PaidAmount > 0 ? PaymentStatus.PartiallyPaid : PaymentStatus.Unpaid;
+
+    public async Task PayFromWallet(Order order, CancellationToken ct = default)
+    {
+        var account = await GetAccount(order.UserId, ct);
+        var amount = Math.Min(account.Credit, order.TotalAmount - order.PaidAmount);
+        if (amount <= 0) return;
+        // Accepted debt was charged already. Pending checkout is debited as it is funded.
+        FinancialEntry? debit = null;
+        if (order.Status == OrderStatus.Pending)
+        {
+            debit = new() { UserId = order.UserId, OrderId = order.Id, Amount = -amount, Kind = "OrderPrepayment" };
+            context.FinancialEntries.Add(debit);
+        }
+        Allocate(order, amount, debit, "Wallet");
+    }
+
 }

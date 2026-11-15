@@ -221,6 +221,9 @@ namespace CookieShop.Infra.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("AllowPayLater")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal?>("DebtLimit")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -382,6 +385,18 @@ namespace CookieShop.Infra.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("PayLater")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("ShippingAddressLine1")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -431,6 +446,8 @@ namespace CookieShop.Infra.Migrations
 
                     b.ToTable("Orders", t =>
                         {
+                            t.HasCheckConstraint("CK_Order_PaidAmount", "\"PaidAmount\" >= 0 AND \"PaidAmount\" <= \"TotalAmount\" AND \"PaidAmount\" = trunc(\"PaidAmount\")");
+
                             t.HasCheckConstraint("CK_Order_Total", "\"TotalAmount\" >= 0 AND \"TotalAmount\" = trunc(\"TotalAmount\")");
                         });
                 });
@@ -470,6 +487,103 @@ namespace CookieShop.Infra.Migrations
                             t.HasCheckConstraint("CK_OrderItem_Price", "\"UnitPrice\" >= 1 AND \"UnitPrice\" = trunc(\"UnitPrice\")");
 
                             t.HasCheckConstraint("CK_OrderItem_Quantity", "\"Quantity\" BETWEEN 1 AND 1000");
+                        });
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.OrderPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("FinancialEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FinancialEntryId");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("OrderPayments", t =>
+                        {
+                            t.HasCheckConstraint("CK_OrderPayment_Amount", "\"Amount\" > 0 AND \"Amount\" = trunc(\"Amount\")");
+                        });
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.PaymentAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Authority")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TransactionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("Provider", "Authority")
+                        .IsUnique();
+
+                    b.HasIndex("Provider", "TransactionId")
+                        .IsUnique()
+                        .HasFilter("\"TransactionId\" IS NOT NULL");
+
+                    b.ToTable("PaymentAttempts", t =>
+                        {
+                            t.HasCheckConstraint("CK_PaymentAttempt_Amount", "\"Amount\" > 0 AND \"Amount\" = trunc(\"Amount\")");
                         });
                 });
 
@@ -811,6 +925,35 @@ namespace CookieShop.Infra.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.OrderPayment", b =>
+                {
+                    b.HasOne("CookieShop.Domain.Entities.FinancialEntry", "FinancialEntry")
+                        .WithMany()
+                        .HasForeignKey("FinancialEntryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CookieShop.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FinancialEntry");
+
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.PaymentAttempt", b =>
+                {
+                    b.HasOne("CookieShop.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("CookieShop.Domain.Entities.Product", b =>

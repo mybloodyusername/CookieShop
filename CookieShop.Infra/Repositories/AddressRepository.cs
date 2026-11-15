@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CookieShop.Infra.Repositories;
 
-public class AddressRepository(CookieShopDbContext context) : IAddressRepository
+public class AddressRepository(CookieShopDbContext context, CookieShop.Infra.Services.CustomerFinanceService finance) : IAddressRepository
 {
     public async Task<Address?> GetById(Guid id)
     {
@@ -15,11 +15,13 @@ public class AddressRepository(CookieShopDbContext context) : IAddressRepository
 
     public async Task<IReadOnlyCollection<Address>> GetAllByUserId(Guid id)
     {
+        await finance.EnsureCustomer(id);
         return await context.Addresses.AsNoTracking().Where(a => a.UserId == id).ToListAsync();
     }
 
     public async Task<Address> Create(CreateAddressRequest request)
     {
+        await finance.EnsureCustomer(request.UserId);
         var result = await context.Addresses.AddAsync(new Address
         {
             Title = request.Title,
@@ -34,6 +36,7 @@ public class AddressRepository(CookieShopDbContext context) : IAddressRepository
 
     public async Task<Address?> Update(UpdateAddressRequest request)
     {
+        await finance.EnsureCustomer(request.UserId);
         var address = await context.Addresses.FirstOrDefaultAsync(a => a.Id == request.Id && a.UserId == request.UserId);
         if (address is null) return null;
 

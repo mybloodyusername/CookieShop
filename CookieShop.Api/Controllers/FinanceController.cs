@@ -8,9 +8,9 @@ namespace CookieShop.Api.Controllers;
 [ApiController, Route("api/finance"), Authorize]
 public class FinanceController(CustomerFinanceService finance) : ControllerBase
 {
-    [HttpGet("account")]
+    [Authorize(Policy = "CustomerOnly"), HttpGet("account")]
     public Task<AccountResponse> Account(CancellationToken ct) => finance.GetAccount(User.GetUserId(), ct);
-    [HttpGet("history")]
+    [Authorize(Policy = "CustomerOnly"), HttpGet("history")]
     public Task<IReadOnlyCollection<FinancialEntryResponse>> History(CancellationToken ct, int page = 1) => finance.History(User.GetUserId(), page, ct);
     [Authorize(Roles = UserRole.Admin), HttpGet("customers/{userId:guid}")]
     public Task<AccountResponse> Customer(Guid userId, CancellationToken ct) => finance.GetAccount(userId, ct);

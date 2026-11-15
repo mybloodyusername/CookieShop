@@ -88,6 +88,7 @@ builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<CustomerFinanceService>();
+builder.Services.AddScoped<IOrderPaymentService, OrderPaymentService>();
 
 var app = builder.Build();
 

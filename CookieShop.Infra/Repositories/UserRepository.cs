@@ -14,6 +14,16 @@ public class UserRepository(
     CookieShopDbContext context,
     UserManager<ApplicationUser> userManager) : IUserRepository
 {
+    public async Task<IReadOnlyDictionary<Guid, string>> GetRoles(IReadOnlyCollection<Guid> userIds)
+    {
+        var memberships = await (from membership in context.UserRoles
+            join role in context.Roles on membership.RoleId equals role.Id
+            where userIds.Contains(membership.UserId)
+            select new { membership.UserId, role.Name }).ToListAsync();
+        return memberships.GroupBy(x => x.UserId).ToDictionary(x => x.Key,
+            x => x.Any(r => r.Name == UserRole.Admin) ? UserRole.Admin : x.First().Name!);
+    }
+
     public async Task<ApplicationUser?> GetById(Guid userId)
     {
         return await userManager.FindByIdAsync(userId.ToString());
@@ -85,6 +95,9 @@ public class UserRepository(
 
     public async Task<string> AssignRole(ApplicationUser applicationUser, string userRole)
     {
+        if (!UserRole.All.Contains(userRole)) throw new ValidationException("Invalid role.");
+        var existing = await userManager.GetRolesAsync(applicationUser);
+        if (existing.Any(x => x != userRole)) throw new ConflictException("Administrator and customer roles cannot be combined.");
         var roleResult = await userManager.AddToRoleAsync(applicationUser, userRole);
         if (roleResult.Succeeded) return userRole;
         var errors = string.Join("; ", roleResult.Errors.Select(e => e.Description));

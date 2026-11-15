@@ -1,5 +1,8 @@
 @baseUrl = https://localhost:7000
 @token = replace-with-access-token
+@orderId = 00000000-0000-0000-0000-000000000000
+@attemptId = 00000000-0000-0000-0000-000000000000
+@csrf = replace-with-csrf-token
 @customerId = 00000000-0000-0000-0000-000000000000
 
 ### My account
@@ -21,13 +24,48 @@ Authorization: Bearer {{token}}
 ### Admin: credit terms
 PUT {{baseUrl}}/api/finance/customers/{{customerId}}/terms
 Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
 Content-Type: application/json
 
-{"debtLimit":5000000,"dueAt":"2026-12-01T00:00:00Z","monthlyDueDay":null}
+{"allowPayLater":true,"debtLimit":5000000,"dueAt":"2026-12-01T00:00:00Z","monthlyDueDay":null}
 
 ### Admin: record funds received (retry-safe reference)
 POST {{baseUrl}}/api/finance/customers/{{customerId}}/payments
 Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
 Content-Type: application/json
 
 {"amount":500000,"reference":"bank-transfer-123"}
+
+
+### Customer: apply wallet credit to an order
+POST {{baseUrl}}/api/payments/orders/{{orderId}}/wallet
+Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
+
+### Customer: start checkout (requires a registered IPaymentGateway adapter)
+POST {{baseUrl}}/api/payments/orders/{{orderId}}/gateway
+Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"provider":"your-provider"}
+
+### Provider callback: verify stored attempt with provider server (no CSRF)
+POST {{baseUrl}}/api/payments/{{attemptId}}/verify
+
+### Customer: prepaid checkout; change payLater to true only for approved accounts
+POST {{baseUrl}}/api/Order/Create
+Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"addressId":"00000000-0000-0000-0000-000000000000","note":null,"payLater":false}
+
+### Admin: reject a pending order, returning funded money to the customer account
+PUT {{baseUrl}}/api/Order/UpdateStatusByAdmin
+Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"orderId":"{{orderId}}","status":"Rejected"}

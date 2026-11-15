@@ -11,7 +11,7 @@ namespace CookieShop.Api.Controllers
     [ApiController]
     public class AddressController(AddressService addressService) : ControllerBase
     {
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpGet]
         public async Task<ActionResult<IReadOnlyCollection<AddressResponse>>> GetAllByUserId()
         {
@@ -20,7 +20,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpPost("Create")]
         public async Task<ActionResult<AddressResponse>> Create([FromBody] CreateAddressRequest address)
         {
@@ -30,7 +30,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpPut("Update")]
         public async Task<ActionResult<AddressResponse>> Update([FromBody] UpdateAddressRequest address)
         {
@@ -39,7 +39,7 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
-        [Authorize(Roles = UserRole.Customer)]
+        [Authorize(Policy = "CustomerOnly")]
         [HttpDelete("{id}")]
         public async Task<ActionResult> Delete(Guid id)
         {

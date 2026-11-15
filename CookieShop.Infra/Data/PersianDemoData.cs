@@ -41,11 +41,12 @@ public static class PersianDemoData
                 x => new Category { Id = Guid.NewGuid(), Name = x });
             var products = PersianSampleCatalog.Create(categories, now);
             var images = PrepareImages(products, now);
-            var addresses = CreateAddresses(owner);
-            var orders = CreateOrders(owner.Id, addresses, products, now);
+            var customer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "demo-customer", PhoneNumber = "09120000001", Email = "demo-customer@example.invalid" };
+            var addresses = CreateAddresses(customer);
+            var orders = CreateOrders(customer.Id, addresses, products, now);
             var cart = new Cart
             {
-                Id = Guid.NewGuid(), UserId = owner.Id,
+                Id = Guid.NewGuid(), UserId = customer.Id,
                 Items = new List<CartItem>
                 {
                     new() { Id = Guid.NewGuid(), Product = products[1], Quantity = 2 },
@@ -64,7 +65,7 @@ public static class PersianDemoData
             // before applying those migrations. Identity credentials for admins are never deleted.
             await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
             {
-                string[] resetTables = ["ProductImages", "ImageBlobs", "MediaImages", "OrderItems", "Orders",
+                string[] resetTables = ["OrderPayments", "PaymentAttempts", "FinancialEntries", "CustomerPaymentTerms", "ProductImages", "ImageBlobs", "MediaImages", "OrderItems", "Orders",
                     "CartItems", "Carts", "Products", "Categories", "Addresses"];
                 foreach (var table in resetTables.Where(tables.Contains))
                 {
@@ -82,11 +83,23 @@ public static class PersianDemoData
 
             await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
             {
+                var users = services.GetRequiredService<UserManager<ApplicationUser>>();
+                var created = await users.CreateAsync(customer, Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) + "Aa1!");
+                if (!created.Succeeded) throw new InvalidOperationException(string.Join("; ", created.Errors.Select(x => x.Description)));
+                var assigned = await users.AddToRoleAsync(customer, UserRole.Customer);
+                if (!assigned.Succeeded) throw new InvalidOperationException("Could not assign sample customer role.");
                 db.Categories.AddRange(categories.Values);
                 db.Products.AddRange(products);
                 db.MediaImages.AddRange(images.Select(x => x.Image));
                 db.Addresses.AddRange(addresses);
                 db.Orders.AddRange(orders);
+                foreach (var order in orders.Where(x => x.PaidAmount > 0))
+                {
+                    var receipt = new FinancialEntry { UserId = customer.Id, Order = order, Amount = order.TotalAmount, Kind = "Payment", Reference = $"demo:{order.Id:N}" };
+                    db.FinancialEntries.Add(receipt);
+                    db.FinancialEntries.Add(new() { UserId = customer.Id, Order = order, Amount = -order.TotalAmount, Kind = "OrderPrepayment" });
+                    db.OrderPayments.Add(new() { Order = order, Amount = order.PaidAmount, FinancialEntry = receipt, Source = "Demo" });
+                }
                 db.Carts.Add(cart);
                 foreach (var admin in await db.Users.Where(x => adminIds.Contains(x.Id)).ToListAsync(cancellationToken))
                 {
@@ -100,7 +113,7 @@ public static class PersianDemoData
                 await transaction.CommitAsync(cancellationToken);
             }
             logger.LogInformation(
-                "Persian sample setup complete: {Admins} admin(s) preserved, 0 customers, {Categories} categories, {Products} products, {Images} WebP images, {Addresses} addresses, {Orders} orders, 1 cart. All amounts are whole toman.",
+                "Persian sample setup complete: {Admins} admin(s) preserved, 1 sample customer, {Categories} categories, {Products} products, {Images} WebP images, {Addresses} addresses, {Orders} orders, 1 cart. All amounts are whole toman.",
                 admins.Count, categories.Count, products.Count, images.Count, addresses.Length, orders.Count);
         }
         finally
@@ -156,8 +169,8 @@ public static class PersianDemoData
             new(OrderStatus.Delivered, 16, 2, "هدیه نمونه تولد؛ بسته‌بندی هدیه و کارت تبریک همراه سفارش.", [(21, 1), (9, 2)]),
             new(OrderStatus.Shipped, 8, 0, "سفارش نمونه ارسال‌شده؛ بسته در مسیر تحویل است.", [(8, 2), (12, 1), (15, 1)]),
             new(OrderStatus.Shipped, 6, 2, "بسته هدیه نمونه؛ لطفاً پیش از تحویل با گیرنده هماهنگ شود.", [(22, 1), (5, 1)]),
-            new(OrderStatus.Paid, 4, 1, "سفارش نمونه با وضعیت پرداخت‌شده؛ در انتظار آماده‌سازی برای ارسال.", [(23, 1), (4, 2)]),
-            new(OrderStatus.Paid, 3, 0, "سفارش نمونه با پرداخت نمایشی؛ لطفاً طعم‌ها جداگانه بسته‌بندی شوند.", [(6, 1), (10, 1), (13, 2)]),
+            new(OrderStatus.Accepted, 4, 1, "سفارش نمونه با وضعیت پرداخت‌شده؛ در انتظار آماده‌سازی برای ارسال.", [(23, 1), (4, 2)]),
+            new(OrderStatus.Accepted, 3, 0, "سفارش نمونه با پرداخت نمایشی؛ لطفاً طعم‌ها جداگانه بسته‌بندی شوند.", [(6, 1), (10, 1), (13, 2)]),
             new(OrderStatus.Pending, 2, 0, "سفارش نمونه در انتظار پرداخت؛ موجودی اقلام رزرو شده است.", [(1, 2), (9, 1)]),
             new(OrderStatus.Pending, 1, 1, "سفارش نمونه دورهمی؛ در انتظار تکمیل پرداخت.", [(20, 1), (2, 1), (11, 1)]),
             new(OrderStatus.Pending, 0, 2, "سفارش نمونه هدیه؛ در انتظار پرداخت و تأیید نهایی.", [(22, 1), (16, 1)]),
@@ -182,6 +195,11 @@ public static class PersianDemoData
                 order.Items.Add(new OrderItem { Id = Guid.NewGuid(), Product = product, ProductName = product.Name, UnitPrice = price, Quantity = quantity });
                 order.TotalAmount += price * quantity;
                 if (draft.Status != OrderStatus.Cancelled) product.StockQuantity -= quantity;
+            }
+            if (order.Status is OrderStatus.Accepted or OrderStatus.Shipped or OrderStatus.Delivered)
+            {
+                order.PaidAmount = order.TotalAmount;
+                order.PaymentStatus = PaymentStatus.Paid;
             }
             return order;
         }).ToList();

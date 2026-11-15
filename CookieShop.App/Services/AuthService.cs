@@ -52,7 +52,7 @@ public class AuthService(
         });
 
         var response = user.Adapt<UserResponse>();
-        response.Role = roles.FirstOrDefault();
+        response.Role = roles.Contains(UserRole.Admin) ? UserRole.Admin : roles.FirstOrDefault();
         return response;
     }
 

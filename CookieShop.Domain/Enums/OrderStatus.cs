@@ -2,10 +2,10 @@ namespace CookieShop.Domain.Enums;
 
 public enum OrderStatus
 {
-    Pending,
-    Paid,
-    Shipped,
-    Delivered,
-    Cancelled,
-    Accepted
+    Pending = 0,
+    Shipped = 2,
+    Delivered = 3,
+    Cancelled = 4,
+    Accepted = 5,
+    Rejected = 6
 }
