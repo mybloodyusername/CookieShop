@@ -1,15 +1,18 @@
+using System.Data;
 using CookieShop.App.DTOs.Common;
 using CookieShop.App.Exceptions;
 using CookieShop.App.Interfaces.Repositories;
-using CookieShop.Domain.Entities;
 using CookieShop.Domain.Constants;
+using CookieShop.Domain.Entities;
 using CookieShop.Domain.Enums;
 using CookieShop.Infra.Data;
+using CookieShop.Infra.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace CookieShop.Infra.Repositories;
 
-public class OrderRepository(CookieShopDbContext context, CookieShop.Infra.Services.CustomerFinanceService finance) : IOrderRepository
+public class OrderRepository(CookieShopDbContext context, CustomerFinanceService finance)
+    : IOrderRepository
 {
     public async Task<Order?> GetById(Guid id)
     {
@@ -46,9 +49,11 @@ public class OrderRepository(CookieShopDbContext context, CookieShop.Infra.Servi
 
     public async Task<Order> PlaceOrder(Guid userId, Guid addressId, string? note)
     {
-        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
-        var address = await context.Addresses.AsNoTracking().FirstOrDefaultAsync(x => x.Id == addressId && x.UserId == userId)
-            ?? throw new NotFoundException("Address not found.");
+        await using var transaction =
+            await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        var address = await context.Addresses.AsNoTracking()
+                          .FirstOrDefaultAsync(x => x.Id == addressId && x.UserId == userId)
+                      ?? throw new NotFoundException("Address not found.");
         var cart = await context.Carts
             .Include(c => c.Items)
             .FirstOrDefaultAsync(c => c.UserId == userId);
@@ -80,7 +85,8 @@ public class OrderRepository(CookieShopDbContext context, CookieShop.Infra.Servi
 
             var unitPrice = product.IsOnSale && product.SalePrice is { } sale ? sale : product.Price;
             total += unitPrice * item.Quantity;
-            if (!StoreCurrency.IsValid(total)) throw new ConflictException("Order total exceeds the supported toman amount.");
+            if (!StoreCurrency.IsValid(total))
+                throw new ConflictException("Order total exceeds the supported toman amount.");
 
             orderItems.Add(new OrderItem
             {
@@ -93,7 +99,8 @@ public class OrderRepository(CookieShopDbContext context, CookieShop.Infra.Servi
             product.StockQuantity -= item.Quantity;
         }
 
-        var pendingExposure = await context.Orders.Where(x => x.UserId == userId && x.Status == OrderStatus.Pending).SumAsync(x => (decimal?)x.TotalAmount) ?? 0;
+        var pendingExposure = await context.Orders.Where(x => x.UserId == userId && x.Status == OrderStatus.Pending)
+            .SumAsync(x => (decimal?)x.TotalAmount) ?? 0;
         await finance.EnsureCanOrder(userId, pendingExposure + total);
 
         var order = new Order
@@ -120,12 +127,14 @@ public class OrderRepository(CookieShopDbContext context, CookieShop.Infra.Servi
 
     public async Task<Order?> Cancel(Guid id)
     {
-        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        await using var transaction =
+            await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var order = await context.Orders
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == id);
         if (order is null) return null;
-        if (order.Status is not (OrderStatus.Pending or OrderStatus.Accepted)) throw new ConflictException("Only pending orders can be cancelled.");
+        if (order.Status is not (OrderStatus.Pending or OrderStatus.Accepted))
+            throw new ConflictException("Only pending orders can be cancelled.");
 
         var productIds = order.Items.Select(i => i.ProductId).ToList();
         var products = await context.Products
@@ -140,7 +149,8 @@ public class OrderRepository(CookieShopDbContext context, CookieShop.Infra.Servi
         }
 
         if (order.Status == OrderStatus.Accepted && order.TotalAmount > 0)
-            context.FinancialEntries.Add(new FinancialEntry { UserId = order.UserId, OrderId = order.Id, Amount = order.TotalAmount, Kind = "CancellationCredit" });
+            context.FinancialEntries.Add(new FinancialEntry
+                { UserId = order.UserId, OrderId = order.Id, Amount = order.TotalAmount, Kind = "CancellationCredit" });
         order.Status = OrderStatus.Cancelled;
         order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -152,7 +162,8 @@ public class OrderRepository(CookieShopDbContext context, CookieShop.Infra.Servi
     public async Task<Order?> UpdateStatus(Guid id, OrderStatus newStatus)
     {
         if (newStatus == OrderStatus.Cancelled) return await Cancel(id);
-        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+        await using var transaction =
+            await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var order = await context.Orders.FirstOrDefaultAsync(o => o.Id == id);
         if (order is null) return null;
 
@@ -166,8 +177,13 @@ public class OrderRepository(CookieShopDbContext context, CookieShop.Infra.Servi
         {
             await finance.EnsureCanOrder(order.UserId, order.TotalAmount);
             if (order.TotalAmount > 0)
-                context.FinancialEntries.Add(new FinancialEntry { UserId = order.UserId, OrderId = order.Id, Amount = -order.TotalAmount, Kind = "OrderCharge", DueAt = await finance.ChargeDueAt(order.UserId) });
+                context.FinancialEntries.Add(new FinancialEntry
+                {
+                    UserId = order.UserId, OrderId = order.Id, Amount = -order.TotalAmount, Kind = "OrderCharge",
+                    DueAt = await finance.ChargeDueAt(order.UserId)
+                });
         }
+
         order.Status = newStatus;
         order.UpdatedAt = DateTimeOffset.UtcNow;
 

@@ -39,6 +39,14 @@ namespace CookieShop.Api.Controllers
             return Ok(result);
         }
 
+        /// <summary>Updates the authenticated customer's name. Email and phone are administrator-only fields.</summary>
+        [Authorize(Roles = UserRole.Customer)]
+        [HttpPut("Me")]
+        public async Task<ActionResult<UserResponse>> UpdateMe([FromBody] UpdateMyProfileRequest request)
+        {
+            return Ok(await userService.UpdateMyProfile(User.GetUserId(), request));
+        }
+
         [Authorize(Roles = UserRole.Admin)]
         [HttpPost("CreateByAdmin")]
         public async Task<ActionResult<UserResponse>> Create([FromBody] CreateUserRequest request)

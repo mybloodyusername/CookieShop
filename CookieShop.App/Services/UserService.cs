@@ -53,6 +53,19 @@ public class UserService(IUserRepository userRepository, UserManager<Application
         return user.Adapt<UserResponse>();
     }
 
+    public async Task<UserResponse> UpdateMyProfile(Guid userId, UpdateMyProfileRequest request)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString())
+            ?? throw new NotFoundException("User not found.");
+        user.FirstName = request.FirstName;
+        user.LastName = request.LastName;
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            throw new System.ComponentModel.DataAnnotations.ValidationException(string.Join("; ", result.Errors.Select(x => x.Description)));
+        return user.Adapt<UserResponse>();
+    }
+
     public async Task<UserResponse> Me(Guid id)
     {
         var result = await userRepository.GetById(id);
