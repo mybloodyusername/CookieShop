@@ -4,6 +4,7 @@ using CookieShop.App.Services;
 using CookieShop.Domain.Constants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.ComponentModel.DataAnnotations;
 
 namespace CookieShop.Api.Controllers
@@ -13,17 +14,21 @@ namespace CookieShop.Api.Controllers
     public class UserController(UserService userService) : ControllerBase
     {
         /// <summary>Checks whether a phone number can be used for a new account.</summary>
+        [AllowAnonymous, EnableRateLimiting("auth")]
         [HttpGet("PhoneNumberAvailability")]
         public async Task<ActionResult<AvailabilityResponse>> PhoneNumberAvailability(
-            [FromQuery, Required, RegularExpression(@"^09[0-9]{9}$")] string phoneNumber)
+            [FromQuery, Required, RegularExpression(@"^09[0-9]{9}$")]
+            string phoneNumber)
         {
             return Ok(new AvailabilityResponse(await userService.IsPhoneNumberAvailable(phoneNumber)));
         }
 
         /// <summary>Checks whether an email address can be used for a new account.</summary>
+        [AllowAnonymous, EnableRateLimiting("auth")]
         [HttpGet("EmailAvailability")]
         public async Task<ActionResult<AvailabilityResponse>> EmailAvailability(
-            [FromQuery, Required, EmailAddress, MaxLength(256)] string email)
+            [FromQuery, Required, EmailAddress, MaxLength(256)]
+            string email)
         {
             return Ok(new AvailabilityResponse(await userService.IsEmailAvailable(email)));
         }
