@@ -20,6 +20,8 @@ public class OrderConfig : IEntityTypeConfiguration<Order>
         builder.Property<uint>("Version").IsRowVersion();
         builder.Property(e => e.TotalAmount).HasPrecision(18, 2);
         builder.Property(e => e.PaidAmount).HasPrecision(18, 2);
+        builder.Property(e => e.RefundedAmount).HasPrecision(18, 2);
+        builder.ToTable(t => t.HasCheckConstraint("CK_Order_RefundedAmount", "\"RefundedAmount\" >= 0 AND \"RefundedAmount\" <= \"PaidAmount\" AND \"RefundedAmount\" = trunc(\"RefundedAmount\")"));
         builder.Property(e => e.PaymentStatus).HasConversion<string>().HasMaxLength(20);
         builder.ToTable(t => t.HasCheckConstraint("CK_Order_PaidAmount", "\"PaidAmount\" >= 0 AND \"PaidAmount\" <= \"TotalAmount\" AND \"PaidAmount\" = trunc(\"PaidAmount\")"));
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);

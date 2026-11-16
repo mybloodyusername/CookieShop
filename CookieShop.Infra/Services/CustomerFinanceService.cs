@@ -13,6 +13,10 @@ public class CustomerFinanceService(CookieShopDbContext context)
     {
         await EnsureCustomer(userId, ct);
         var balance = await context.FinancialEntries.Where(x => x.UserId == userId).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+        var debt = await context.Orders.Where(x => x.UserId == userId &&
+            (x.Status == OrderStatus.Accepted || x.Status == OrderStatus.Shipped || x.Status == OrderStatus.Delivered))
+            .SumAsync(x => (decimal?)(x.TotalAmount - x.PaidAmount), ct) ?? 0;
+        var credit = balance + debt;
         var terms = await context.CustomerPaymentTerms.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, ct);
         var overdue = await (from charge in context.FinancialEntries
             join order in context.Orders on charge.OrderId equals order.Id
@@ -20,8 +24,8 @@ public class CustomerFinanceService(CookieShopDbContext context)
                 && order.PaidAmount < order.TotalAmount && charge.Kind == "OrderCharge" && charge.DueAt <= DateTimeOffset.UtcNow
             select charge.Id).AnyAsync(ct);
         var reason = overdue ? "OVERDUE_DEBT: Please pay your overdue debt before placing another order."
-            : terms?.DebtLimit is {} limit && -balance >= limit && balance < 0 ? "DEBT_LIMIT_REACHED: Please pay your debt before placing another order." : null;
-        return new(balance, Math.Max(0, -balance), Math.Max(0, balance), terms?.DebtLimit, terms?.DueAt, reason, terms?.AllowPayLater == true);
+            : terms?.DebtLimit is {} limit && debt >= limit && debt > 0 ? "DEBT_LIMIT_REACHED: Please pay your debt before placing another order." : null;
+        return new(balance, debt, Math.Max(0, credit), terms?.DebtLimit, terms?.DueAt, reason, terms?.AllowPayLater == true);
     }
     public async Task<DateTimeOffset?> ChargeDueAt(Guid userId)
     {
@@ -41,16 +45,37 @@ public class CustomerFinanceService(CookieShopDbContext context)
         var account = await GetAccount(userId, ct);
         if (!account.AllowPayLater) throw new ConflictException("PAY_LATER_DISABLED: Pay later is not enabled for this customer.");
         if (account.OrderingBlockReason is {} reason) throw new ConflictException(reason);
-        if (account.DebtLimit is {} limit && additionalExposure - account.Balance > limit)
+        if (account.DebtLimit is {} limit && additionalExposure + account.Debt - account.Credit > limit)
             throw new ConflictException("DEBT_LIMIT_EXCEEDED: This order would exceed your debt limit. Please add funds or pay your debt.");
     }
     public async Task<IReadOnlyCollection<FinancialEntryResponse>> History(Guid userId, int page, CancellationToken ct)
     {
-        await GetAccount(userId, ct);
-        return await context.FinancialEntries.AsNoTracking().Where(x => x.UserId == userId).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
-            .Skip((Math.Max(1, page) - 1) * 50).Take(50)
-            .Select(x => new FinancialEntryResponse(x.Id, x.OrderId, x.Amount, x.Kind, x.Reference, x.RecordedBy, x.CreatedAt)).ToListAsync(ct);
+        await EnsureCustomer(userId, ct);
+        var entries = await context.FinancialEntries.AsNoTracking().Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
+            .Skip((Math.Max(1, page) - 1) * 50).Take(50).ToListAsync(ct);
+        return await MapEntries(entries, ct);
     }
+
+    public async Task<FinancialEntryResponse> GetEntry(Guid userId, Guid entryId, CancellationToken ct)
+    {
+        await EnsureCustomer(userId, ct);
+        var entry = await context.FinancialEntries.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId && x.Id == entryId, ct)
+            ?? throw new NotFoundException("Financial entry not found.");
+        return (await MapEntries([entry], ct)).Single();
+    }
+
+    private async Task<IReadOnlyCollection<FinancialEntryResponse>> MapEntries(IReadOnlyCollection<FinancialEntry> entries, CancellationToken ct)
+    {
+        var ids = entries.Select(x => x.Id).ToList();
+        var allocations = await context.OrderPayments.AsNoTracking().Where(x => x.FinancialEntryId != null && ids.Contains(x.FinancialEntryId.Value))
+            .Select(x => new { EntryId = x.FinancialEntryId!.Value, Allocation = new PaymentAllocationResponse(x.OrderId, x.Order.OrderNumber, x.Amount) })
+            .ToListAsync(ct);
+        return entries.Select(x => new FinancialEntryResponse(x.Id, x.OrderId, x.Amount, x.Kind, x.Reference, x.RecordedBy,
+            x.CreatedAt, x.Method, x.Description, x.OccurredAt,
+            allocations.Where(a => a.EntryId == x.Id).Select(a => a.Allocation).ToList())).ToList();
+    }
+
     public async Task<AccountResponse> SetTerms(Guid userId, PaymentTermsRequest request, CancellationToken ct)
     {
         if (request.MonthlyDueDay is < 1 or > 28) throw new ValidationException("Monthly due day must be between 1 and 28 (Gregorian UTC).");
@@ -67,28 +92,113 @@ public class CustomerFinanceService(CookieShopDbContext context)
         await tx.CommitAsync(ct);
         return await GetAccount(userId, ct);
     }
-    public async Task<AccountResponse> RecordPayment(Guid userId, Guid adminId, RecordPaymentRequest request, CancellationToken ct)
+    private static void ValidateReceipt(decimal amount, string reference, string method, string description, DateTimeOffset? occurredAt)
     {
-        if (!StoreCurrency.IsValid(request.Amount) || request.Amount == 0 || string.IsNullOrWhiteSpace(request.Reference) || request.Reference.Length > 128)
-            throw new ValidationException("A positive whole-toman amount and a reference of at most 128 characters are required.");
+        if (!StoreCurrency.IsValid(amount) || amount == 0 || string.IsNullOrWhiteSpace(reference) || reference.Length > 128 ||
+            string.IsNullOrWhiteSpace(method) || method.Length > 32 || string.IsNullOrWhiteSpace(description) || description.Length > 1024)
+            throw new ValidationException("A positive whole-toman amount, reference (128), method (32), and description (1024) are required.");
+        if (occurredAt > DateTimeOffset.UtcNow.AddMinutes(1))
+            throw new ValidationException("Payment/refund occurrence cannot be in the future.");
+    }
+
+    public async Task<FinancialEntryResponse> RecordPayment(Guid userId, Guid adminId, RecordPaymentRequest request, CancellationToken ct)
+    {
+        ValidateReceipt(request.Amount, request.Reference, request.Method, request.Description, request.OccurredAt);
+        var allocations = request.Allocations?.ToList() ?? [];
+        if (allocations.Count > 500 || allocations.Any(a => a.OrderId == Guid.Empty || !StoreCurrency.IsValid(a.Amount) || a.Amount == 0) ||
+            allocations.Select(a => a.OrderId).Distinct().Count() != allocations.Count || allocations.Sum(a => a.Amount) > request.Amount)
+            throw new ValidationException("Select distinct orders with positive whole-toman allocations totaling no more than the receipt amount (maximum 500 orders).");
         await using var tx = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-        await GetAccount(userId, ct);
+        await EnsureCustomer(userId, ct);
         var reference = request.Reference.Trim();
         var existing = await context.FinancialEntries.SingleOrDefaultAsync(x => x.UserId == userId && x.Reference == reference, ct);
         if (existing is not null)
         {
-            if (existing.Kind != "Payment" || existing.Amount != request.Amount) throw new ConflictException("Payment reference already used for a different transaction.");
+            var saved = await context.OrderPayments.Where(x => x.FinancialEntryId == existing.Id).ToListAsync(ct);
+            if (!Matches(existing, "Payment", request.Amount, request.Method, request.Description, request.OccurredAt) ||
+                saved.Count != allocations.Count || saved.Any(p => !allocations.Any(a => a.OrderId == p.OrderId && a.Amount == p.Amount)))
+                throw new ConflictException("Payment reference already used for a different transaction.");
         }
         else
         {
-            var entry = new FinancialEntry { UserId = userId, Amount = request.Amount, Kind = "Payment", Reference = reference, RecordedBy = adminId };
-            context.FinancialEntries.Add(entry);
-            await AllocateDebtPayment(userId, request.Amount, entry, ct);
+            var ids = allocations.Select(a => a.OrderId).ToList();
+            var orders = await context.Orders.Where(o => ids.Contains(o.Id) && o.UserId == userId).ToDictionaryAsync(o => o.Id, ct);
+            if (orders.Count != ids.Count) throw new NotFoundException("A selected order does not belong to this customer.");
+            foreach (var allocation in allocations)
+            {
+                var order = orders[allocation.OrderId];
+                if (order.Status is OrderStatus.Cancelled or OrderStatus.Rejected || allocation.Amount > order.TotalAmount - order.PaidAmount)
+                    throw new ConflictException("An allocation exceeds an order's outstanding amount or targets a closed order.");
+            }
+            existing = new FinancialEntry { UserId = userId, Amount = request.Amount, Kind = "Payment", Reference = reference,
+                Method = request.Method.Trim(), Description = request.Description.Trim(), OccurredAt = request.OccurredAt?.ToUniversalTime(), RecordedBy = adminId };
+            context.FinancialEntries.Add(existing);
+            foreach (var allocation in allocations)
+            {
+                var order = orders[allocation.OrderId];
+                if (order.Status == OrderStatus.Pending)
+                    context.FinancialEntries.Add(new() { UserId = userId, OrderId = order.Id, Amount = -allocation.Amount, Kind = "OrderPrepayment" });
+                Allocate(order, allocation.Amount, existing, "Manual");
+            }
             await context.SaveChangesAsync(ct);
         }
         await tx.CommitAsync(ct);
-        return await GetAccount(userId, ct);
+        return await GetEntry(userId, existing.Id, ct);
     }
+
+    private static bool Matches(FinancialEntry entry, string kind, decimal amount, string method, string description, DateTimeOffset? occurredAt) =>
+        entry.Kind == kind && entry.Amount == amount && entry.Method == method.Trim() && entry.Description == description.Trim() &&
+        entry.OccurredAt == occurredAt?.ToUniversalTime();
+
+    public async Task<FinancialEntryResponse> RecordRefund(Guid userId, Guid adminId, RecordRefundRequest request, CancellationToken ct)
+    {
+        ValidateReceipt(request.Amount, request.Reference, request.Method, request.Description, request.OccurredAt);
+        await using var tx = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+        var account = await GetAccount(userId, ct);
+        var reference = request.Reference.Trim();
+        var entry = await context.FinancialEntries.SingleOrDefaultAsync(x => x.UserId == userId && x.Reference == reference, ct);
+        if (entry is not null)
+        {
+            if (!Matches(entry, "Refund", -request.Amount, request.Method, request.Description, request.OccurredAt) || entry.OrderId != request.OrderId)
+                throw new ConflictException("Refund reference already used for a different transaction.");
+        }
+        else
+        {
+            Order? order = null;
+            if (request.OrderId is {} orderId)
+            {
+                order = await context.Orders.SingleOrDefaultAsync(x => x.Id == orderId && x.UserId == userId, ct)
+                    ?? throw new NotFoundException("Order not found for this customer.");
+                if (request.Amount > order.PaidAmount - order.RefundedAmount)
+                    throw new ConflictException("Refund exceeds the order's remaining refundable paid amount.");
+            }
+            if (order is null || order.Status is OrderStatus.Cancelled or OrderStatus.Rejected)
+            {
+                if (request.Amount > account.Credit)
+                    throw new ConflictException("Refund exceeds available wallet credit. Released funds may already have been spent.");
+            }
+            else
+            {
+                // A live-order refund is a price credit plus a cash payout. It does
+                // not reopen paid debt or change fulfilment, even after delivery.
+                context.FinancialEntries.Add(new() { UserId = userId, OrderId = order.Id, Amount = request.Amount,
+                    Kind = "OrderRefundCredit", RecordedBy = adminId, Description = request.Description.Trim() });
+            }
+            entry = new() { UserId = userId, OrderId = order?.Id, Amount = -request.Amount, Kind = "Refund", Reference = reference,
+                Method = request.Method.Trim(), Description = request.Description.Trim(), OccurredAt = request.OccurredAt?.ToUniversalTime(), RecordedBy = adminId };
+            context.FinancialEntries.Add(entry);
+            if (order is not null)
+            {
+                order.RefundedAmount += request.Amount;
+                order.UpdatedAt = DateTimeOffset.UtcNow;
+                RefreshPaymentStatus(order);
+            }
+            await context.SaveChangesAsync(ct);
+        }
+        await tx.CommitAsync(ct);
+        return await GetEntry(userId, entry.Id, ct);
+    }
+
     public async Task EnsureCustomer(Guid userId, CancellationToken ct = default)
     {
         var roles = await (from membership in context.UserRoles
@@ -96,24 +206,6 @@ public class CustomerFinanceService(CookieShopDbContext context)
             where membership.UserId == userId select role.Name).ToListAsync(ct);
         if (!roles.Contains(UserRole.Customer) || roles.Contains(UserRole.Admin))
             throw new NotFoundException("Customer not found.");
-    }
-
-    // Caller owns the serializable transaction. Payments settle accepted debt oldest first.
-    public async Task AllocateDebtPayment(Guid userId, decimal available, FinancialEntry source, CancellationToken ct = default)
-    {
-        var orders = await context.Orders.Where(x => x.UserId == userId &&
-                (x.Status == OrderStatus.Accepted || x.Status == OrderStatus.Shipped || x.Status == OrderStatus.Delivered)
-                && x.PaidAmount < x.TotalAmount)
-            .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToListAsync(ct);
-        foreach (var order in orders)
-        {
-            if (available <= 0) break;
-            if (order.Status is OrderStatus.Cancelled or OrderStatus.Rejected) continue;
-            var amount = Math.Min(available, order.TotalAmount - order.PaidAmount);
-            if (amount <= 0) continue;
-            Allocate(order, amount, source, "DebtPayment");
-            available -= amount;
-        }
     }
 
     public void Allocate(Order order, decimal amount, FinancialEntry? source, string kind)
@@ -126,10 +218,16 @@ public class CustomerFinanceService(CookieShopDbContext context)
         order.UpdatedAt = DateTimeOffset.UtcNow;
     }
 
-    public static void RefreshPaymentStatus(Order order) => order.PaymentStatus =
-        order.Status is OrderStatus.Cancelled or OrderStatus.Rejected && order.PaidAmount > 0 ? PaymentStatus.Refunded :
-        order.PaidAmount >= order.TotalAmount ? PaymentStatus.Paid :
-        order.PaidAmount > 0 ? PaymentStatus.PartiallyPaid : PaymentStatus.Unpaid;
+    public static void RefreshPaymentStatus(Order order)
+    {
+        var closed = order.Status is OrderStatus.Cancelled or OrderStatus.Rejected;
+        order.PaymentStatus = order.RefundedAmount > 0
+            ? order.RefundedAmount == order.PaidAmount && (closed || order.PaidAmount == order.TotalAmount)
+                ? PaymentStatus.Refunded : PaymentStatus.PartiallyRefunded
+            : closed && order.PaidAmount > 0 ? PaymentStatus.WalletCredited
+            : order.PaidAmount >= order.TotalAmount ? PaymentStatus.Paid
+            : order.PaidAmount > 0 ? PaymentStatus.PartiallyPaid : PaymentStatus.Unpaid;
+    }
 
     public async Task PayFromWallet(Order order, CancellationToken ct = default)
     {

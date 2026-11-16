@@ -4,8 +4,10 @@ namespace CookieShop.Domain.Entities;
 public class PaymentAttempt
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid OrderId { get; set; }
-    public Order Order { get; set; } = null!;
+    public Guid? OrderId { get; set; }
+    public Order? Order { get; set; }
+    public Guid UserId { get; set; }
+    public ApplicationUser User { get; set; } = null!;
     public decimal Amount { get; set; }
     public string Provider { get; set; } = "";
     public string Authority { get; set; } = "";

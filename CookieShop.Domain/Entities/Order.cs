@@ -28,6 +28,8 @@ public class Order
     // Snapshotted at checkout; customers cannot opt themselves into credit.
     public bool PayLater { get; set; }
     public decimal PaidAmount { get; set; }
+    public decimal RefundedAmount { get; set; }
+    public ICollection<OrderStatusChange> StatusChanges { get; set; } = new List<OrderStatusChange>();
     public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
 
     [MaxLength(256)] public string? Note { get; set; }

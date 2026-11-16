@@ -12,6 +12,9 @@ public class FinancialEntry
     public DateTimeOffset? DueAt { get; set; }
     public string Kind { get; set; } = "";
     public string Reference { get; set; } = "";
+    public string Method { get; set; } = "";
+    public string Description { get; set; } = "";
+    public DateTimeOffset? OccurredAt { get; set; }
     public Guid? RecordedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

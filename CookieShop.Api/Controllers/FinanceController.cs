@@ -18,6 +18,21 @@ public class FinanceController(CustomerFinanceService finance) : ControllerBase
     public Task<IReadOnlyCollection<FinancialEntryResponse>> CustomerHistory(Guid userId, CancellationToken ct, int page = 1) => finance.History(userId, page, ct);
     [Authorize(Roles = UserRole.Admin), HttpPut("customers/{userId:guid}/terms")]
     public Task<AccountResponse> Terms(Guid userId, PaymentTermsRequest request, CancellationToken ct) => finance.SetTerms(userId, request, ct);
+    /// <summary>Records an external receipt and explicitly allocates it to selected orders.</summary>
     [Authorize(Roles = UserRole.Admin), HttpPost("customers/{userId:guid}/payments")]
-    public Task<AccountResponse> Payment(Guid userId, RecordPaymentRequest request, CancellationToken ct) => finance.RecordPayment(userId, User.GetUserId(), request, ct);
+    public async Task<ActionResult<FinancialEntryResponse>> Payment(Guid userId, RecordPaymentRequest request, CancellationToken ct)
+    {
+        var entry = await finance.RecordPayment(userId, User.GetUserId(), request, ct);
+        return CreatedAtAction(nameof(Entry), new { userId, entryId = entry.Id }, entry);
+    }
+    /// <summary>Records money already returned to a customer by cash, transfer, or another external method.</summary>
+    [Authorize(Roles = UserRole.Admin), HttpPost("customers/{userId:guid}/refunds")]
+    public async Task<ActionResult<FinancialEntryResponse>> Refund(Guid userId, RecordRefundRequest request, CancellationToken ct)
+    {
+        var entry = await finance.RecordRefund(userId, User.GetUserId(), request, ct);
+        return CreatedAtAction(nameof(Entry), new { userId, entryId = entry.Id }, entry);
+    }
+    /// <summary>Returns one customer receipt, refund, or ledger posting with its order allocations.</summary>
+    [Authorize(Roles = UserRole.Admin), HttpGet("customers/{userId:guid}/entries/{entryId:guid}")]
+    public Task<FinancialEntryResponse> Entry(Guid userId, Guid entryId, CancellationToken ct) => finance.GetEntry(userId, entryId, ct);
 }

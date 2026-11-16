@@ -66,7 +66,7 @@ public static class PersianDemoData
             // before applying those migrations. Identity credentials for admins are never deleted.
             await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
             {
-                string[] resetTables = ["OrderPayments", "PaymentAttempts", "FinancialEntries", "CustomerPaymentTerms", "ProductImages", "ImageBlobs", "MediaImages", "OrderItems", "Orders",
+                string[] resetTables = ["OrderStatusChanges", "OrderPayments", "PaymentAttempts", "FinancialEntries", "CustomerPaymentTerms", "ProductImages", "ImageBlobs", "MediaImages", "OrderItems", "Orders",
                     "CartItems", "Carts", "Products", "Categories", "Addresses"];
                 foreach (var table in resetTables.Where(tables.Contains))
                 {
@@ -190,6 +190,7 @@ public static class PersianDemoData
                 ShippingAddressLine2 = address.AddressLine2, ShippingPhoneNumber = address.PhoneNumber,
                 CreatedAt = created, UpdatedAt = draft.Status == OrderStatus.Pending ? created : created.AddHours(2)
             };
+            order.StatusChanges.Add(new() { ToStatus = order.Status, Reason = "Development sample baseline" });
             foreach (var (productIndex, quantity) in draft.Lines)
             {
                 var product = products[productIndex];

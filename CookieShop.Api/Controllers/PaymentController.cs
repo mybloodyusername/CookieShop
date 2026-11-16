@@ -20,6 +20,14 @@ public sealed class PaymentController(IOrderPaymentService payments) : Controlle
         return Created($"/api/payments/{checkout.AttemptId}/verify", checkout);
     }
 
+    /// <summary>Starts a wallet top-up before order creation using a configured gateway adapter.</summary>
+    [Authorize(Policy = "CustomerOnly"), HttpPost("wallet/gateway")]
+    public async Task<ActionResult<PaymentCheckoutResponse>> TopUp(StartWalletTopUpRequest request, CancellationToken ct)
+    {
+        var checkout = await payments.StartWalletTopUp(User.GetUserId(), request, ct);
+        return Created($"/api/payments/{checkout.AttemptId}/verify", checkout);
+    }
+
     /// <summary>Asks the configured provider to verify the stored attempt. Callback claims are never trusted.</summary>
     [AllowAnonymous, IgnoreAntiforgeryToken, HttpPost("{attemptId:guid}/verify")]
     public async Task<IActionResult> Verify(Guid attemptId, CancellationToken ct)

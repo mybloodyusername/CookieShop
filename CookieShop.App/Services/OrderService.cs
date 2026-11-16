@@ -72,7 +72,7 @@ public class OrderService(
             result.PageSize);
     }
 
-    public async Task<OrderResponse> Cancel(Guid userId, Guid orderId)
+    public async Task<OrderResponse> Cancel(Guid userId, Guid orderId, string reason)
     {
         var order = await orderRepository.GetById(orderId);
         if (order is null) throw new NotFoundException("Order not found");
@@ -81,12 +81,12 @@ public class OrderService(
         if (order.Status != OrderStatus.Pending)
             throw new ConflictException("Only pending orders can be cancelled.");
 
-        var cancelled = await orderRepository.Cancel(orderId)
+        var cancelled = await orderRepository.Cancel(orderId, userId, reason)
                         ?? throw new NotFoundException("Order not found");
         return ToResponse(cancelled);
     }
 
-    public async Task<OrderResponse> UpdateStatusByAdmin(UpdateOrderStatusRequest request)
+    public async Task<OrderResponse> UpdateStatusByAdmin(Guid adminId, UpdateOrderStatusRequest request)
     {
         if (!Enum.TryParse<OrderStatus>(request.Status, ignoreCase: true, out var newStatus) ||
             !Enum.IsDefined(newStatus))
@@ -109,7 +109,7 @@ public class OrderService(
         if (!allowed)
             throw new ConflictException($"Invalid status transition from {order.Status} to {newStatus}.");
 
-        var updated = await orderRepository.UpdateStatus(order.Id, newStatus)
+        var updated = await orderRepository.UpdateStatus(order.Id, newStatus, adminId, request.Reason)
                       ?? throw new NotFoundException("Order not found");
         return ToResponse(updated);
     }
@@ -121,7 +121,7 @@ public class OrderService(
         order.TotalAmount,
         order.Note,
         order.CreatedAt,
-        order.UpdatedAt) { OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
+        order.UpdatedAt) { RefundedAmount = order.RefundedAmount, OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
 
     private static OrderDetailResponse ToDetail(Order order) => new(
         order.Id,
@@ -132,7 +132,9 @@ public class OrderService(
         order.CreatedAt,
         order.UpdatedAt,
         new AddressResponse(order.AddressId, order.ShippingTitle, order.ShippingAddressLine1, order.ShippingAddressLine2, order.ShippingPhoneNumber, order.UserId),
-        order.Items.Select(ToItemResponse).ToList()) { OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
+        order.Items.Select(ToItemResponse).ToList()) { StatusHistory = order.StatusChanges.OrderBy(x => x.CreatedAt).ThenBy(x => x.Id)
+            .Select(x => new OrderStatusChangeResponse(x.FromStatus?.ToString(), x.ToStatus.ToString(), x.ActorId, x.Reason, x.CreatedAt)).ToList(),
+            RefundedAmount = order.RefundedAmount, OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
 
     private static OrderItemResponse ToItemResponse(OrderItem item) => new(
         item.ProductId,

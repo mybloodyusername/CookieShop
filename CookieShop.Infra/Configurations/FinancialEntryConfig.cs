@@ -8,6 +8,10 @@ public class FinancialEntryConfig : IEntityTypeConfiguration<FinancialEntry>
     {
         b.Property(x => x.Amount).HasPrecision(18, 2);
         b.Property(x => x.Kind).HasMaxLength(32);
+        b.Property(x => x.Method).HasMaxLength(32);
+        b.Property(x => x.Description).HasMaxLength(1024);
+        b.HasIndex(x => new { x.UserId, x.CreatedAt });
+        b.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.RecordedBy).OnDelete(DeleteBehavior.Restrict);
         b.Property(x => x.Reference).HasMaxLength(128);
         b.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);

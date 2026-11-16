@@ -1,7 +1,8 @@
-@baseUrl = https://localhost:7000
+@baseUrl = http://localhost:5265
 @token = replace-with-access-token
 @orderId = 00000000-0000-0000-0000-000000000000
 @attemptId = 00000000-0000-0000-0000-000000000000
+@entryId = 00000000-0000-0000-0000-000000000000
 @csrf = replace-with-csrf-token
 @customerId = 00000000-0000-0000-0000-000000000000
 
@@ -35,7 +36,7 @@ Authorization: Bearer {{token}}
 X-CSRF-TOKEN: {{csrf}}
 Content-Type: application/json
 
-{"amount":500000,"reference":"bank-transfer-123"}
+{"amount":500000,"reference":"bank-transfer-123","method":"BankTransfer","description":"Receipt 123, customer transfer","allocations":[{"orderId":"{{orderId}}","amount":400000}],"occurredAt":"2026-11-16T09:00:00+03:30"}
 
 
 ### Customer: apply wallet credit to an order
@@ -68,4 +69,41 @@ Authorization: Bearer {{token}}
 X-CSRF-TOKEN: {{csrf}}
 Content-Type: application/json
 
-{"orderId":"{{orderId}}","status":"Rejected"}
+{"orderId":"{{orderId}}","status":"Rejected","reason":"Unable to fulfil selected items"}
+
+
+### Admin: record an actual external refund (does not initiate a bank transfer)
+POST {{baseUrl}}/api/finance/customers/{{customerId}}/refunds
+Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"amount":100000,"reference":"refund-transfer-456","method":"BankTransfer","description":"Returned to customer, transfer 456","orderId":"{{orderId}}"}
+
+### Admin: inspect a receipt/refund and its allocations
+GET {{baseUrl}}/api/finance/customers/{{customerId}}/entries/{{entryId}}
+Authorization: Bearer {{token}}
+
+### Customer: fund wallet before creating an order (requires registered adapter)
+POST {{baseUrl}}/api/payments/wallet/gateway
+Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"amount":500000,"provider":"your-provider"}
+
+### Customer: cancel a pending order with a reason
+PUT {{baseUrl}}/api/Order/Cancel/{{orderId}}
+Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"reason":"I no longer need this order"}
+
+### Error: reject receipt containing another customer's order (404)
+POST {{baseUrl}}/api/finance/customers/{{customerId}}/payments
+Authorization: Bearer {{token}}
+X-CSRF-TOKEN: {{csrf}}
+Content-Type: application/json
+
+{"amount":100000,"reference":"bad-owner-example","method":"Cash","description":"Ownership validation example","allocations":[{"orderId":"00000000-0000-0000-0000-000000000000","amount":100000}]}

@@ -261,6 +261,11 @@ namespace CookieShop.Infra.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
                     b.Property<DateTimeOffset?>("DueAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -268,6 +273,14 @@ namespace CookieShop.Infra.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset?>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid");
@@ -288,6 +301,10 @@ namespace CookieShop.Infra.Migrations
                     b.HasIndex("OrderId")
                         .IsUnique()
                         .HasFilter("\"Kind\" = 'OrderCharge'");
+
+                    b.HasIndex("RecordedBy");
+
+                    b.HasIndex("UserId", "CreatedAt");
 
                     b.HasIndex("UserId", "Reference")
                         .IsUnique()
@@ -402,6 +419,10 @@ namespace CookieShop.Infra.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<decimal>("RefundedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<string>("ShippingAddressLine1")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -457,6 +478,8 @@ namespace CookieShop.Infra.Migrations
                             t.HasCheckConstraint("CK_Order_Number", "\"OrderNumber\" ~ '^[0-9]{8}-[0-9]{6}$'");
 
                             t.HasCheckConstraint("CK_Order_PaidAmount", "\"PaidAmount\" >= 0 AND \"PaidAmount\" <= \"TotalAmount\" AND \"PaidAmount\" = trunc(\"PaidAmount\")");
+
+                            t.HasCheckConstraint("CK_Order_RefundedAmount", "\"RefundedAmount\" >= 0 AND \"RefundedAmount\" <= \"PaidAmount\" AND \"RefundedAmount\" = trunc(\"RefundedAmount\")");
 
                             t.HasCheckConstraint("CK_Order_Total", "\"TotalAmount\" >= 0 AND \"TotalAmount\" = trunc(\"TotalAmount\")");
                         });
@@ -536,6 +559,44 @@ namespace CookieShop.Infra.Migrations
                         });
                 });
 
+            modelBuilder.Entity("CookieShop.Domain.Entities.OrderStatusChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorId");
+
+                    b.HasIndex("OrderId", "CreatedAt");
+
+                    b.ToTable("OrderStatusChanges");
+                });
+
             modelBuilder.Entity("CookieShop.Domain.Entities.PaymentAttempt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -557,7 +618,7 @@ namespace CookieShop.Infra.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("OrderId")
+                    b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Provider")
@@ -574,6 +635,9 @@ namespace CookieShop.Infra.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -583,6 +647,8 @@ namespace CookieShop.Infra.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("UserId");
 
                     b.HasIndex("Provider", "Authority")
                         .IsUnique();
@@ -879,6 +945,11 @@ namespace CookieShop.Infra.Migrations
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("CookieShop.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RecordedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("CookieShop.Domain.Entities.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
@@ -955,15 +1026,38 @@ namespace CookieShop.Infra.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("CookieShop.Domain.Entities.PaymentAttempt", b =>
+            modelBuilder.Entity("CookieShop.Domain.Entities.OrderStatusChange", b =>
                 {
-                    b.HasOne("CookieShop.Domain.Entities.Order", "Order")
+                    b.HasOne("CookieShop.Domain.Entities.ApplicationUser", null)
                         .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CookieShop.Domain.Entities.Order", "Order")
+                        .WithMany("StatusChanges")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("CookieShop.Domain.Entities.PaymentAttempt", b =>
+                {
+                    b.HasOne("CookieShop.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CookieShop.Domain.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("CookieShop.Domain.Entities.Product", b =>
@@ -1070,6 +1164,8 @@ namespace CookieShop.Infra.Migrations
             modelBuilder.Entity("CookieShop.Domain.Entities.Order", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("StatusChanges");
                 });
 
             modelBuilder.Entity("CookieShop.Domain.Entities.Product", b =>

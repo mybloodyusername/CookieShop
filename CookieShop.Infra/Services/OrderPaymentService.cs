@@ -1,4 +1,6 @@
 using System.Data;
+using System.ComponentModel.DataAnnotations;
+using CookieShop.Domain.Constants;
 using CookieShop.App.DTOs.Finance;
 using CookieShop.App.Exceptions;
 using CookieShop.App.Interfaces;
@@ -31,8 +33,21 @@ public sealed class OrderPaymentService(CookieShopDbContext context, CustomerFin
         await finance.EnsureCustomer(userId, ct);
         var order = await OwnedOrder(userId, orderId, ct);
         EnsurePayable(order);
-        var gateway = Gateway(provider);
-        var attempt = new PaymentAttempt { OrderId = orderId, Amount = order.TotalAmount - order.PaidAmount, Provider = provider };
+        return await CreateAttempt(new PaymentAttempt { UserId = userId, OrderId = orderId,
+            Amount = order.TotalAmount - order.PaidAmount, Provider = provider }, ct);
+    }
+
+    public async Task<PaymentCheckoutResponse> StartWalletTopUp(Guid userId, StartWalletTopUpRequest request, CancellationToken ct)
+    {
+        if (!StoreCurrency.IsValid(request.Amount) || request.Amount == 0)
+            throw new ValidationException("Top-up must be a positive whole-toman amount.");
+        await finance.EnsureCustomer(userId, ct);
+        return await CreateAttempt(new PaymentAttempt { UserId = userId, Amount = request.Amount, Provider = request.Provider }, ct);
+    }
+
+    private async Task<PaymentCheckoutResponse> CreateAttempt(PaymentAttempt attempt, CancellationToken ct)
+    {
+        var gateway = Gateway(attempt.Provider);
         // Persist the merchant key before contacting the provider so interrupted checkouts are auditable.
         attempt.Status = "Creating";
         attempt.Authority = $"creating:{attempt.Id:N}";
@@ -67,22 +82,25 @@ public sealed class OrderPaymentService(CookieShopDbContext context, CustomerFin
         }
         else
         {
-            var order = await context.Orders.SingleAsync(x => x.Id == attempt.OrderId, ct);
-            await finance.EnsureCustomer(order.UserId, ct);
-            var receipt = new FinancialEntry { UserId = order.UserId, OrderId = order.Id, Amount = attempt.Amount, Kind = "GatewayPayment",
-                Reference = $"gateway:{attempt.Id:N}" };
+            await finance.EnsureCustomer(attempt.UserId, ct);
+            var order = attempt.OrderId is {} orderId
+                ? await context.Orders.SingleAsync(x => x.Id == orderId && x.UserId == attempt.UserId, ct) : null;
+            var receipt = new FinancialEntry { UserId = attempt.UserId, OrderId = order?.Id, Amount = attempt.Amount, Kind = "GatewayPayment",
+                Reference = $"gateway:{attempt.Id:N}", Method = "Gateway", Description = $"{attempt.Provider}: {verified.TransactionId}",
+                OccurredAt = DateTimeOffset.UtcNow };
             context.FinancialEntries.Add(receipt);
-            var amount = Math.Min(attempt.Amount, order.TotalAmount - order.PaidAmount);
-            if (amount > 0)
+            if (order is not null && order.Status is not (OrderStatus.Cancelled or OrderStatus.Rejected))
             {
-                if (order.Status == OrderStatus.Pending)
-                    context.FinancialEntries.Add(new() { UserId = order.UserId, OrderId = order.Id, Amount = -amount, Kind = "OrderPrepayment" });
-                // Cancelled/rejected orders retain the receipt as wallet credit, without a new debit.
-                finance.Allocate(order, amount, receipt, "Gateway");
+                var amount = Math.Min(attempt.Amount, order.TotalAmount - order.PaidAmount);
+                if (amount > 0)
+                {
+                    if (order.Status == OrderStatus.Pending)
+                        context.FinancialEntries.Add(new() { UserId = order.UserId, OrderId = order.Id, Amount = -amount, Kind = "OrderPrepayment" });
+                    finance.Allocate(order, amount, receipt, "Gateway");
+                }
             }
-            // Excess receipts (e.g. two successful attempts) remain wallet credit or settle other debt.
-            var remaining = attempt.Amount - (order.Status is OrderStatus.Cancelled or OrderStatus.Rejected ? 0 : amount);
-            if (remaining > 0) await finance.AllocateDebtPayment(order.UserId, remaining, receipt, ct);
+            // Top-ups, excess and late payments remain wallet credit. Other orders
+            // are never silently marked paid.
             attempt.Status = "Succeeded";
             attempt.TransactionId = verified.TransactionId;
         }
@@ -100,5 +118,5 @@ public sealed class OrderPaymentService(CookieShopDbContext context, CustomerFin
             throw new ConflictException("This order has no payable amount.");
     }
     private static OrderPaymentResponse Response(Order order) => new(order.Id, order.Status.ToString(),
-        order.PaymentStatus.ToString(), order.PaidAmount, Math.Max(0, order.TotalAmount - order.PaidAmount));
+        order.PaymentStatus.ToString(), order.PaidAmount, Math.Max(0, order.TotalAmount - order.PaidAmount), order.RefundedAmount);
 }

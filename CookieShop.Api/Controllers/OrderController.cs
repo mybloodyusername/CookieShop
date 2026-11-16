@@ -42,10 +42,10 @@ namespace CookieShop.Api.Controllers
 
         [Authorize(Policy = "CustomerOnly")]
         [HttpPut("Cancel/{id}")]
-        public async Task<ActionResult<OrderResponse>> Cancel(Guid id)
+        public async Task<ActionResult<OrderResponse>> Cancel(Guid id, [FromBody] CancelOrderRequest request)
         {
             var userId = User.GetUserId();
-            var result = await orderService.Cancel(userId, id);
+            var result = await orderService.Cancel(userId, id, request.Reason);
             return Ok(result);
         }
 
@@ -70,7 +70,7 @@ namespace CookieShop.Api.Controllers
         [HttpPut("UpdateStatusByAdmin")]
         public async Task<ActionResult<OrderResponse>> UpdateStatusByAdmin([FromBody] UpdateOrderStatusRequest request)
         {
-            var result = await orderService.UpdateStatusByAdmin(request);
+            var result = await orderService.UpdateStatusByAdmin(User.GetUserId(), request);
             return Ok(result);
         }
     }

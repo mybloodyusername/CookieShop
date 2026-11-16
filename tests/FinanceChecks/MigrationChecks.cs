@@ -37,7 +37,17 @@ static class MigrationChecks
         catch (PostgresException e) when (e.MessageText.StartsWith("Reconcile legacy fulfilled"))
         { Console.WriteLine("PASS Migration refuses ambiguous historical fulfilment"); }
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM \"Orders\" WHERE \"Id\" = {ambiguous}");
+        await migrator.MigrateAsync("20261115172430_AddOrderNumber");
+        var attempt = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "PaymentAttempts" ("Id","OrderId","Amount","Provider","Authority","Status","CreatedAt")
+            VALUES ({attempt},{pending},300,'legacy','legacy-attempt','Pending',now());
+            """);
         await db.Database.MigrateAsync();
+        if (await db.PaymentAttempts.Where(x => x.Id == attempt).Select(x => x.UserId).SingleAsync() != user ||
+            await db.OrderStatusChanges.CountAsync(x => x.OrderId == pending && x.ActorId == null && x.Reason.StartsWith("Migration baseline")) != 1)
+            throw new Exception("Migration did not preserve payment-attempt ownership and historical status baseline.");
+        Console.WriteLine("PASS Migration backfills attempt ownership and honest status baselines");
         var orders = await db.Orders.AsNoTracking().Where(x => x.UserId == user).ToDictionaryAsync(x => x.Id);
         if (!orders[paid].OrderNumber.StartsWith("14050101-") || orders.Values.Any(x => x.OrderNumber.Length != 15) ||
             orders.Values.Select(x => x.OrderNumber).Distinct().Count() != orders.Count)

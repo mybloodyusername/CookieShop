@@ -1,4 +1,5 @@
 using System.Data;
+using System.ComponentModel.DataAnnotations;
 using Npgsql;
 using CookieShop.App.DTOs.Common;
 using CookieShop.App.Exceptions;
@@ -17,8 +18,9 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
 {
     public async Task<Order?> GetById(Guid id)
     {
-        return await context.Orders.AsNoTracking()
+        return await context.Orders.AsNoTracking().AsSplitQuery()
             .Include(o => o.Items)
+            .Include(o => o.StatusChanges)
             .Include(o => o.Address)
             .FirstOrDefaultAsync(o => o.Id == id);
     }
@@ -119,7 +121,9 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             product.StockQuantity -= item.Quantity;
         }
 
-        await finance.EnsureCustomer(userId);
+        var account = await finance.GetAccount(userId);
+        if (!payLater && account.Credit < total)
+            throw new ConflictException("PAYMENT_REQUIRED: Fund your wallet before creating this order.");
         var pendingExposure = await context.Orders.Where(x => x.UserId == userId && x.Status == OrderStatus.Pending && x.PayLater)
             .SumAsync(x => (decimal?)(x.TotalAmount - x.PaidAmount)) ?? 0;
         if (payLater) await finance.EnsureCanOrder(userId, pendingExposure + total);
@@ -138,6 +142,7 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             Note = note,
             Items = orderItems,
         };
+        order.StatusChanges.Add(new() { ToStatus = OrderStatus.Pending, ActorId = userId, Reason = "Order created" });
         order.OrderNumber = OrderNumberGenerator.Generate(order.CreatedAt);
         await context.Orders.AddAsync(order);
 
@@ -165,10 +170,13 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         return order;
     }
 
-    public async Task<Order?> Cancel(Guid id) => await CancelOrReject(id, OrderStatus.Cancelled, allowAccepted: false);
+    public async Task<Order?> Cancel(Guid id, Guid actorId, string reason) =>
+        await CancelOrReject(id, OrderStatus.Cancelled, actorId, reason, allowAccepted: false);
 
-    private async Task<Order?> CancelOrReject(Guid id, OrderStatus terminalStatus, bool allowAccepted = true)
+    private async Task<Order?> CancelOrReject(Guid id, OrderStatus terminalStatus, Guid actorId, string? reason, bool allowAccepted = true)
     {
+        if (string.IsNullOrWhiteSpace(reason) || reason.Length > 512)
+            throw new ValidationException("A cancellation/rejection reason of at most 512 characters is required.");
         await using var transaction =
             await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var order = await context.Orders
@@ -196,15 +204,14 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         // Reverse exactly what was charged: funded money for pending orders, full charge for accepted ones.
         var charged = -(await context.FinancialEntries.Where(x => x.OrderId == id &&
             (x.Kind == "OrderCharge" || x.Kind == "OrderPrepayment")).SumAsync(x => (decimal?)x.Amount) ?? 0);
+        charged -= order.RefundedAmount;
         if (charged > 0)
         {
             var credit = new FinancialEntry { UserId = order.UserId, OrderId = order.Id,
                 Amount = charged, Kind = "CancellationCredit" };
             context.FinancialEntries.Add(credit);
-            order.Status = terminalStatus;
-            // Any returned credit first settles other accepted debt; the rest remains in the wallet.
-            await finance.AllocateDebtPayment(order.UserId, Math.Min(charged, order.PaidAmount), credit);
         }
+        context.OrderStatusChanges.Add(new() { OrderId = order.Id, FromStatus = order.Status, ToStatus = terminalStatus, ActorId = actorId, Reason = reason.Trim() });
         order.Status = terminalStatus;
         CustomerFinanceService.RefreshPaymentStatus(order);
         order.UpdatedAt = DateTimeOffset.UtcNow;
@@ -214,9 +221,9 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         return order;
     }
 
-    public async Task<Order?> UpdateStatus(Guid id, OrderStatus newStatus)
+    public async Task<Order?> UpdateStatus(Guid id, OrderStatus newStatus, Guid actorId, string? reason = null)
     {
-        if (newStatus is OrderStatus.Cancelled or OrderStatus.Rejected) return await CancelOrReject(id, newStatus);
+        if (newStatus is OrderStatus.Cancelled or OrderStatus.Rejected) return await CancelOrReject(id, newStatus, actorId, reason);
         await using var transaction =
             await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var order = await context.Orders.FirstOrDefaultAsync(o => o.Id == id);
@@ -247,6 +254,8 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
                 });
         }
 
+        if (reason?.Length > 512) throw new ValidationException("Status reason must be at most 512 characters.");
+        context.OrderStatusChanges.Add(new() { OrderId = order.Id, FromStatus = order.Status, ToStatus = newStatus, ActorId = actorId, Reason = reason?.Trim() ?? "" });
         order.Status = newStatus;
         order.UpdatedAt = DateTimeOffset.UtcNow;
 

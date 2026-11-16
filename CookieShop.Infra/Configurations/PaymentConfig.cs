@@ -25,6 +25,7 @@ public class PaymentAttemptConfig : IEntityTypeConfiguration<PaymentAttempt>
         b.Property(x => x.Status).HasMaxLength(20);
         b.Property<uint>("Version").IsRowVersion();
         b.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.Provider, x.Authority }).IsUnique();
         b.HasIndex(x => new { x.Provider, x.TransactionId }).IsUnique().HasFilter("\"TransactionId\" IS NOT NULL");
         b.ToTable(t => t.HasCheckConstraint("CK_PaymentAttempt_Amount", "\"Amount\" > 0 AND \"Amount\" = trunc(\"Amount\")"));
