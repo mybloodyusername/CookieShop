@@ -13,6 +13,7 @@ namespace CookieShop.Infra.Services;
 public sealed class OrderPaymentService(CookieShopDbContext context, CustomerFinanceService finance,
     IEnumerable<IPaymentGateway> gateways) : IOrderPaymentService
 {
+    // TODO: gateway implementation — register the real ZarinPal adapter here when credentials and callback URLs are ready.
     private IPaymentGateway Gateway(string provider) => gateways.SingleOrDefault(x => x.Provider == provider)
         ?? throw new ConflictException("This payment gateway is not configured.");
 

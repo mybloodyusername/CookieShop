@@ -1,6 +1,8 @@
 using CookieShop.App.DTOs.Common;
 using CookieShop.App.DTOs.Order;
 using CookieShop.App.Extensions;
+using CookieShop.App.Interfaces;
+using Microsoft.Extensions.Hosting;
 using CookieShop.App.Services;
 using CookieShop.Domain.Constants;
 using CookieShop.Domain.Enums;
@@ -11,14 +13,14 @@ namespace CookieShop.Api.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class OrderController(OrderService orderService) : ControllerBase
+    public class OrderController(OrderService orderService, IEnumerable<IPaymentGateway> gateways, IHostEnvironment environment) : ControllerBase
     {
         [Authorize(Policy = "CustomerOnly")]
         [HttpPost("Create")]
         public async Task<ActionResult<OrderDetailResponse>> Create([FromBody] CreateOrderRequest request)
         {
             var userId = User.GetUserId();
-            var result = await orderService.PlaceOrder(userId, request);
+            var result = await orderService.PlaceOrder(userId, request, environment.IsDevelopment() || gateways.Any());
             return Ok(result);
         }
 

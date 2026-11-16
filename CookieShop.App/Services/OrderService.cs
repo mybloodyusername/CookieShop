@@ -17,7 +17,7 @@ public class OrderService(
     IAddressRepository addressRepository,
     ILogger<OrderService> logger)
 {
-    public async Task<OrderDetailResponse> PlaceOrder(Guid userId, CreateOrderRequest request)
+    public async Task<OrderDetailResponse> PlaceOrder(Guid userId, CreateOrderRequest request, bool allowUnfunded)
     {
         var address = await addressRepository.GetById(request.AddressId);
         if (address is null) throw new NotFoundException("Address not found.");
@@ -26,7 +26,7 @@ public class OrderService(
 
         try
         {
-            var order = await orderRepository.PlaceOrder(userId, request.AddressId, request.Note, request.PayLater);
+            var order = await orderRepository.PlaceOrder(userId, request.AddressId, request.Note, request.PayLater, allowUnfunded);
             var detail = await orderRepository.GetById(order.Id);
             if (detail is null) throw new NotFoundException("Order not found");
             return ToDetail(detail);

@@ -50,13 +50,13 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         return new PagedResult<Order>(items, totalCount, page, pageSize);
     }
 
-    public async Task<Order> PlaceOrder(Guid userId, Guid addressId, string? note, bool payLater = false)
+    public async Task<Order> PlaceOrder(Guid userId, Guid addressId, string? note, bool payLater = false, bool allowUnfunded = false)
     {
         for (var attempt = 0; ; attempt++)
         {
             try
             {
-                return await PlaceOrderOnce(userId, addressId, note, payLater);
+                return await PlaceOrderOnce(userId, addressId, note, payLater, allowUnfunded);
             }
             catch (Exception e) when (attempt < 3 &&
                 (e is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure } ||
@@ -69,7 +69,7 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         }
     }
 
-    private async Task<Order> PlaceOrderOnce(Guid userId, Guid addressId, string? note, bool payLater)
+    private async Task<Order> PlaceOrderOnce(Guid userId, Guid addressId, string? note, bool payLater, bool allowUnfunded)
     {
         await using var transaction =
             await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -121,9 +121,13 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             product.StockQuantity -= item.Quantity;
         }
 
-        var account = await finance.GetAccount(userId);
-        if (!payLater && account.Credit < total)
-            throw new ConflictException("PAYMENT_REQUIRED: Fund your wallet before creating this order.");
+        if (!allowUnfunded)
+        {
+            var account = await finance.GetAccount(userId);
+            if (!payLater && account.Credit < total)
+                throw new ConflictException("PAYMENT_REQUIRED: Fund your wallet before creating this order.");
+        }
+
         var pendingExposure = await context.Orders.Where(x => x.UserId == userId && x.Status == OrderStatus.Pending && x.PayLater)
             .SumAsync(x => (decimal?)(x.TotalAmount - x.PaidAmount)) ?? 0;
         if (payLater) await finance.EnsureCanOrder(userId, pendingExposure + total);
