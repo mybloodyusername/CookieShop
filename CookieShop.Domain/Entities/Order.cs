@@ -25,7 +25,7 @@ public class Order
     public decimal TotalAmount { get; set; }
 
     // Snapshotted at checkout; customers cannot opt themselves into credit.
-    public bool PayLater { get; set; }
+    public bool MonthlyBilling { get; set; }
     public decimal PaidAmount { get; set; }
     public decimal RefundedAmount { get; set; }
     public ICollection<OrderStatusChange> StatusChanges { get; set; } = new List<OrderStatusChange>();

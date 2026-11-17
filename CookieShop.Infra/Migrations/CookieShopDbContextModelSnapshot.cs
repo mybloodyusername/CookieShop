@@ -221,18 +221,17 @@ namespace CookieShop.Infra.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("AllowPayLater")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal?>("DebtLimit")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<DateTimeOffset?>("DueAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("MonthlyDueDay")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("MonthlySpendingLimit")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
@@ -244,7 +243,7 @@ namespace CookieShop.Infra.Migrations
 
                     b.ToTable("CustomerPaymentTerms", t =>
                         {
-                            t.HasCheckConstraint("CK_PaymentTerms_Limit", "\"DebtLimit\" IS NULL OR (\"DebtLimit\" >= 0 AND \"DebtLimit\" = trunc(\"DebtLimit\"))");
+                            t.HasCheckConstraint("CK_PaymentTerms_MonthlySpendingLimit", "\"MonthlySpendingLimit\" IS NULL OR (\"MonthlySpendingLimit\" >= 0 AND \"MonthlySpendingLimit\" = trunc(\"MonthlySpendingLimit\"))");
                         });
                 });
 
@@ -300,7 +299,7 @@ namespace CookieShop.Infra.Migrations
 
                     b.HasIndex("OrderId")
                         .IsUnique()
-                        .HasFilter("\"Kind\" = 'OrderCharge'");
+                        .HasFilter("\"Kind\" = 'MonthlyCharge'");
 
                     b.HasIndex("RecordedBy");
 
@@ -398,6 +397,9 @@ namespace CookieShop.Infra.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("MonthlyBilling")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Note")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -410,9 +412,6 @@ namespace CookieShop.Infra.Migrations
                     b.Property<decimal>("PaidAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
-
-                    b.Property<bool>("PayLater")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("PaymentStatus")
                         .IsRequired()

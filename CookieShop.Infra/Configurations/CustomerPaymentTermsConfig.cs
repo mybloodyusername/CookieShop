@@ -8,8 +8,8 @@ public class CustomerPaymentTermsConfig : IEntityTypeConfiguration<CustomerPayme
     {
         b.HasKey(x => x.UserId);
         b.HasOne(x => x.User).WithOne().HasForeignKey<CustomerPaymentTerms>(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
-        b.Property(x => x.DebtLimit).HasPrecision(18, 2);
+        b.Property(x => x.MonthlySpendingLimit).HasPrecision(18, 2).HasDefaultValue(0m);
         b.Property<uint>("Version").IsRowVersion();
-        b.ToTable(t => t.HasCheckConstraint("CK_PaymentTerms_Limit", "\"DebtLimit\" IS NULL OR (\"DebtLimit\" >= 0 AND \"DebtLimit\" = trunc(\"DebtLimit\"))"));
+        b.ToTable(t => t.HasCheckConstraint("CK_PaymentTerms_MonthlySpendingLimit", "\"MonthlySpendingLimit\" IS NULL OR (\"MonthlySpendingLimit\" >= 0 AND \"MonthlySpendingLimit\" = trunc(\"MonthlySpendingLimit\"))"));
     }
 }

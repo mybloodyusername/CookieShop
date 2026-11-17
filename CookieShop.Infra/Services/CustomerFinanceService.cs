@@ -12,20 +12,31 @@ public class CustomerFinanceService(CookieShopDbContext context)
     public async Task<AccountResponse> GetAccount(Guid userId, CancellationToken ct = default)
     {
         await EnsureCustomer(userId, ct);
-        var balance = await context.FinancialEntries.Where(x => x.UserId == userId).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
-        var debt = await context.Orders.Where(x => x.UserId == userId &&
+        var ledgerTotal = await context.FinancialEntries.Where(x => x.UserId == userId).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+        var monthlyOutstanding = await context.Orders.Where(x => x.UserId == userId && x.MonthlyBilling &&
             (x.Status == OrderStatus.Accepted || x.Status == OrderStatus.Shipped || x.Status == OrderStatus.Delivered))
             .SumAsync(x => (decimal?)(x.TotalAmount - x.PaidAmount), ct) ?? 0;
-        var credit = balance + debt;
+        var walletBalance = Math.Max(0, ledgerTotal + monthlyOutstanding);
         var terms = await context.CustomerPaymentTerms.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId, ct);
+        var monthlyBillingEnabled = terms is not null && (terms.MonthlySpendingLimit is null || terms.MonthlySpendingLimit > 0);
+        var nextDueAt = await (from charge in context.FinancialEntries
+            join order in context.Orders on charge.OrderId equals order.Id
+            where order.UserId == userId && order.MonthlyBilling && order.PaidAmount < order.TotalAmount
+                && order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Rejected
+                && charge.Kind == "MonthlyCharge"
+            select charge.DueAt).MinAsync(ct);
         var overdue = await (from charge in context.FinancialEntries
             join order in context.Orders on charge.OrderId equals order.Id
-            where order.UserId == userId && order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Rejected
-                && order.PaidAmount < order.TotalAmount && charge.Kind == "OrderCharge" && charge.DueAt <= DateTimeOffset.UtcNow
+            where order.UserId == userId && order.MonthlyBilling && order.Status != OrderStatus.Cancelled && order.Status != OrderStatus.Rejected
+                && order.PaidAmount < order.TotalAmount && charge.Kind == "MonthlyCharge" && charge.DueAt <= DateTimeOffset.UtcNow
             select charge.Id).AnyAsync(ct);
-        var reason = overdue ? "OVERDUE_DEBT: Please pay your overdue debt before placing another order."
-            : terms?.DebtLimit is {} limit && debt >= limit && debt > 0 ? "DEBT_LIMIT_REACHED: Please pay your debt before placing another order." : null;
-        return new(balance, debt, Math.Max(0, credit), terms?.DebtLimit, terms?.DueAt, reason, terms?.AllowPayLater == true);
+        var limit = terms?.MonthlySpendingLimit;
+        var netMonthlyExposure = Math.Max(0, monthlyOutstanding - walletBalance);
+        var reason = overdue ? "OVERDUE_MONTHLY_ACCOUNT: Please settle your overdue monthly account before placing another order."
+            : monthlyBillingEnabled && limit is {} spendingLimit && netMonthlyExposure >= spendingLimit && monthlyOutstanding > 0
+                ? "MONTHLY_SPENDING_LIMIT_REACHED: Please settle your monthly account before placing another order."
+                : null;
+        return new(walletBalance, monthlyOutstanding, limit, terms?.MonthlyDueDay, nextDueAt, reason, monthlyBillingEnabled);
     }
     public async Task<DateTimeOffset?> ChargeDueAt(Guid userId)
     {
@@ -43,10 +54,10 @@ public class CustomerFinanceService(CookieShopDbContext context)
     public async Task EnsureCanOrder(Guid userId, decimal additionalExposure, CancellationToken ct = default)
     {
         var account = await GetAccount(userId, ct);
-        if (!account.AllowPayLater) throw new ConflictException("PAY_LATER_DISABLED: Pay later is not enabled for this customer.");
+        if (!account.MonthlyBillingEnabled) throw new ConflictException("MONTHLY_BILLING_DISABLED: Monthly billing is not enabled for this customer.");
         if (account.OrderingBlockReason is {} reason) throw new ConflictException(reason);
-        if (account.DebtLimit is {} limit && additionalExposure + account.Debt - account.Credit > limit)
-            throw new ConflictException("DEBT_LIMIT_EXCEEDED: This order would exceed your debt limit. Please add funds or pay your debt.");
+        if (account.MonthlySpendingLimit is {} limit && additionalExposure + account.MonthlyOutstanding - account.WalletBalance > limit)
+            throw new ConflictException("MONTHLY_SPENDING_LIMIT_EXCEEDED: This order would exceed the customer's monthly spending limit.");
     }
     public async Task<IReadOnlyCollection<FinancialEntryResponse>> History(Guid userId, int page, CancellationToken ct)
     {
@@ -72,21 +83,21 @@ public class CustomerFinanceService(CookieShopDbContext context)
             .Select(x => new { EntryId = x.FinancialEntryId!.Value, Allocation = new PaymentAllocationResponse(x.OrderId, x.Order.OrderNumber, x.Amount) })
             .ToListAsync(ct);
         return entries.Select(x => new FinancialEntryResponse(x.Id, x.OrderId, x.Amount, x.Kind, x.Reference, x.RecordedBy,
-            x.CreatedAt, x.Method, x.Description, x.OccurredAt,
+            x.CreatedAt, x.Method, x.Description, x.OccurredAt, x.DueAt,
             allocations.Where(a => a.EntryId == x.Id).Select(a => a.Allocation).ToList())).ToList();
     }
 
     public async Task<AccountResponse> SetTerms(Guid userId, PaymentTermsRequest request, CancellationToken ct)
     {
         if (request.MonthlyDueDay is < 1 or > 28) throw new ValidationException("Monthly due day must be between 1 and 28 (Gregorian UTC).");
-        if (request.DebtLimit is {} limit && !StoreCurrency.IsValid(limit)) throw new ValidationException("Debt limit must be a supported whole-toman amount.");
+        if (request.MonthlySpendingLimit is {} limit && (!StoreCurrency.IsValid(limit) || limit < 0))
+            throw new ValidationException("Monthly spending limit must be zero, unlimited, or a supported positive whole-toman amount.");
         await using var tx = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         await GetAccount(userId, ct);
         var terms = await context.CustomerPaymentTerms.SingleOrDefaultAsync(x => x.UserId == userId, ct);
         if (terms is null) { terms = new() { UserId = userId }; context.CustomerPaymentTerms.Add(terms); }
-        terms.AllowPayLater = request.AllowPayLater;
         terms.MonthlyDueDay = request.MonthlyDueDay;
-        terms.DebtLimit = request.DebtLimit;
+        terms.MonthlySpendingLimit = request.MonthlySpendingLimit;
         terms.DueAt = request.DueAt?.ToUniversalTime();
         await context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
@@ -174,8 +185,8 @@ public class CustomerFinanceService(CookieShopDbContext context)
             }
             if (order is null || order.Status is OrderStatus.Cancelled or OrderStatus.Rejected)
             {
-                if (request.Amount > account.Credit)
-                    throw new ConflictException("Refund exceeds available wallet credit. Released funds may already have been spent.");
+                if (request.Amount > account.WalletBalance)
+                    throw new ConflictException("Refund exceeds available wallet funds. Released funds may already have been spent.");
             }
             else
             {
@@ -232,7 +243,7 @@ public class CustomerFinanceService(CookieShopDbContext context)
     public async Task PayFromWallet(Order order, CancellationToken ct = default)
     {
         var account = await GetAccount(order.UserId, ct);
-        var amount = Math.Min(account.Credit, order.TotalAmount - order.PaidAmount);
+        var amount = Math.Min(account.WalletBalance, order.TotalAmount - order.PaidAmount);
         if (amount <= 0) return;
         // Accepted debt was charged already. Pending checkout is debited as it is funded.
         FinancialEntry? debit = null;

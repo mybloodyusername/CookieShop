@@ -26,7 +26,7 @@ public class OrderService(
 
         try
         {
-            var order = await orderRepository.PlaceOrder(userId, request.AddressId, request.Note, request.PayLater, allowUnfunded);
+            var order = await orderRepository.PlaceOrder(userId, request.AddressId, request.Note, request.MonthlyBilling, allowUnfunded);
             var detail = await orderRepository.GetById(order.Id);
             if (detail is null) throw new NotFoundException("Order not found");
             return ToDetail(detail);
@@ -121,7 +121,7 @@ public class OrderService(
         order.TotalAmount,
         order.Note,
         order.CreatedAt,
-        order.UpdatedAt) { RefundedAmount = order.RefundedAmount, OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
+        order.UpdatedAt) { RefundedAmount = order.RefundedAmount, OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, MonthlyBilling = order.MonthlyBilling };
 
     private static OrderDetailResponse ToDetail(Order order) => new(
         order.Id,
@@ -134,7 +134,7 @@ public class OrderService(
         new AddressResponse(order.AddressId, order.ShippingTitle, order.ShippingAddressLine1, order.ShippingAddressLine2, order.ShippingPhoneNumber, order.UserId),
         order.Items.Select(ToItemResponse).ToList()) { StatusHistory = order.StatusChanges.OrderBy(x => x.CreatedAt).ThenBy(x => x.Id)
             .Select(x => new OrderStatusChangeResponse(x.FromStatus?.ToString(), x.ToStatus.ToString(), x.ActorId, x.Reason, x.CreatedAt)).ToList(),
-            RefundedAmount = order.RefundedAmount, OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, PayLater = order.PayLater };
+            RefundedAmount = order.RefundedAmount, OrderNumber = order.OrderNumber, PaymentStatus = order.PaymentStatus.ToString(), PaidAmount = order.PaidAmount, MonthlyBilling = order.MonthlyBilling };
 
     private static OrderItemResponse ToItemResponse(OrderItem item) => new(
         item.ProductId,

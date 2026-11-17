@@ -3,8 +3,8 @@ public class CustomerPaymentTerms
 {
     public Guid UserId { get; set; }
     public ApplicationUser User { get; set; } = null!;
-    public bool AllowPayLater { get; set; }
     public int? MonthlyDueDay { get; set; }
-    public decimal? DebtLimit { get; set; }
+    /// <summary>Zero disables monthly billing; null is unlimited; positive values cap monthly exposure.</summary>
+    public decimal? MonthlySpendingLimit { get; set; } = 0;
     public DateTimeOffset? DueAt { get; set; }
 }

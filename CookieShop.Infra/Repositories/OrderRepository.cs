@@ -49,13 +49,13 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         return new PagedResult<Order>(items, totalCount, page, pageSize);
     }
 
-    public async Task<Order> PlaceOrder(Guid userId, Guid addressId, string? note, bool payLater = false, bool allowUnfunded = false)
+    public async Task<Order> PlaceOrder(Guid userId, Guid addressId, string? note, bool monthlyBilling = false, bool allowUnfunded = false)
     {
         for (var attempt = 0; ; attempt++)
         {
             try
             {
-                return await PlaceOrderOnce(userId, addressId, note, payLater, allowUnfunded);
+                return await PlaceOrderOnce(userId, addressId, note, monthlyBilling, allowUnfunded);
             }
             catch (Exception e) when (attempt < 3 &&
                 (e is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure } ||
@@ -68,7 +68,7 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         }
     }
 
-    private async Task<Order> PlaceOrderOnce(Guid userId, Guid addressId, string? note, bool payLater, bool allowUnfunded)
+    private async Task<Order> PlaceOrderOnce(Guid userId, Guid addressId, string? note, bool monthlyBilling, bool allowUnfunded)
     {
         await using var transaction =
             await context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -123,13 +123,13 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         if (!allowUnfunded)
         {
             var account = await finance.GetAccount(userId);
-            if (!payLater && account.Credit < total)
+            if (!monthlyBilling && account.WalletBalance < total)
                 throw new ConflictException("PAYMENT_REQUIRED: Fund your wallet before creating this order.");
         }
 
-        var pendingExposure = await context.Orders.Where(x => x.UserId == userId && x.Status == OrderStatus.Pending && x.PayLater)
+        var pendingExposure = await context.Orders.Where(x => x.UserId == userId && x.Status == OrderStatus.Pending && x.MonthlyBilling)
             .SumAsync(x => (decimal?)(x.TotalAmount - x.PaidAmount)) ?? 0;
-        if (payLater) await finance.EnsureCanOrder(userId, pendingExposure + total);
+        if (monthlyBilling) await finance.EnsureCanOrder(userId, pendingExposure + total);
 
         var order = new Order
         {
@@ -140,7 +140,7 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             ShippingAddressLine2 = address.AddressLine2,
             ShippingPhoneNumber = address.PhoneNumber,
             Status = OrderStatus.Pending,
-            PayLater = payLater,
+            MonthlyBilling = monthlyBilling,
             TotalAmount = total,
             Note = note,
             Items = orderItems,
@@ -206,7 +206,7 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
 
         // Reverse exactly what was charged: funded money for pending orders, full charge for accepted ones.
         var charged = -(await context.FinancialEntries.Where(x => x.OrderId == id &&
-            (x.Kind == "OrderCharge" || x.Kind == "OrderPrepayment")).SumAsync(x => (decimal?)x.Amount) ?? 0);
+            (x.Kind == "MonthlyCharge" || x.Kind == "OrderPrepayment")).SumAsync(x => (decimal?)x.Amount) ?? 0);
         charged -= order.RefundedAmount;
         if (charged > 0)
         {
@@ -244,15 +244,15 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             var outstanding = order.TotalAmount - order.PaidAmount;
             if (outstanding > 0)
             {
-                if (!order.PayLater) throw new ConflictException("Payment is required before accepting this order.");
-                var reserved = await context.Orders.Where(x => x.UserId == order.UserId && x.Id != order.Id && x.PayLater && x.Status == OrderStatus.Pending)
+                if (!order.MonthlyBilling) throw new ConflictException("Payment is required before accepting this order.");
+                var reserved = await context.Orders.Where(x => x.UserId == order.UserId && x.Id != order.Id && x.MonthlyBilling && x.Status == OrderStatus.Pending)
                     .SumAsync(x => (decimal?)(x.TotalAmount - x.PaidAmount)) ?? 0;
                 await finance.EnsureCanOrder(order.UserId, reserved + outstanding);
             }
             if (outstanding > 0)
                 context.FinancialEntries.Add(new FinancialEntry
                 {
-                    UserId = order.UserId, OrderId = order.Id, Amount = -outstanding, Kind = "OrderCharge",
+                    UserId = order.UserId, OrderId = order.Id, Amount = -outstanding, Kind = "MonthlyCharge",
                     DueAt = await finance.ChargeDueAt(order.UserId)
                 });
         }

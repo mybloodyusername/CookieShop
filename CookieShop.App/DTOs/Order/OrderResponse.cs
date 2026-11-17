@@ -15,6 +15,6 @@ public record OrderResponse(
     public decimal RefundedAmount { get; init; }
     public decimal PaidAmount { get; init; }
     public decimal AmountDue => Status is "Cancelled" or "Rejected" ? 0 : Math.Max(0, TotalAmount - PaidAmount);
-    public bool PayLater { get; init; }
+    public bool MonthlyBilling { get; init; }
     public string Currency => CookieShop.Domain.Constants.StoreCurrency.Code;
 }

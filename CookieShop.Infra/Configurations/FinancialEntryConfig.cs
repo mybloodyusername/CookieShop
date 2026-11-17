@@ -15,7 +15,7 @@ public class FinancialEntryConfig : IEntityTypeConfiguration<FinancialEntry>
         b.Property(x => x.Reference).HasMaxLength(128);
         b.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
-        b.HasIndex(x => x.OrderId).IsUnique().HasFilter("\"Kind\" = 'OrderCharge'");
+        b.HasIndex(x => x.OrderId).IsUnique().HasFilter("\"Kind\" = 'MonthlyCharge'");
         b.HasIndex(x => new { x.UserId, x.Reference }).IsUnique().HasFilter("\"Reference\" <> ''");
         b.ToTable(t => t.HasCheckConstraint("CK_FinancialEntry_Amount", "\"Amount\" <> 0 AND \"Amount\" = trunc(\"Amount\")"));
     }
