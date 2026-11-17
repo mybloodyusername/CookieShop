@@ -466,8 +466,6 @@ namespace CookieShop.Infra.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AddressId");
-
                     b.HasIndex("OrderNumber")
                         .IsUnique();
 
@@ -972,19 +970,11 @@ namespace CookieShop.Infra.Migrations
 
             modelBuilder.Entity("CookieShop.Domain.Entities.Order", b =>
                 {
-                    b.HasOne("CookieShop.Domain.Entities.Address", "Address")
-                        .WithMany()
-                        .HasForeignKey("AddressId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("CookieShop.Domain.Entities.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Address");
 
                     b.Navigation("User");
                 });

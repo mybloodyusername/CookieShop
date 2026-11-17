@@ -21,7 +21,6 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
         return await context.Orders.AsNoTracking().AsSplitQuery()
             .Include(o => o.Items)
             .Include(o => o.StatusChanges)
-            .Include(o => o.Address)
             .FirstOrDefaultAsync(o => o.Id == id);
     }
 

@@ -31,11 +31,6 @@ public class OrderConfig : IEntityTypeConfiguration<Order>
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(e => e.Address)
-            .WithMany()
-            .HasForeignKey(e => e.AddressId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasMany(e => e.Items)
             .WithOne(i => i.Order)
             .HasForeignKey(i => i.OrderId)

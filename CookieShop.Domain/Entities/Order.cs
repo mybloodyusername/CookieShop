@@ -13,8 +13,7 @@ public class Order
     public ApplicationUser User { get; set; } = null!;
 
     public Guid AddressId { get; set; }
-    public Address Address { get; set; } = null!;
-
+    // AddressId is retained as a historical source identifier. Shipping data is snapshotted below.
     [MaxLength(64)] public string ShippingTitle { get; set; } = "";
     [MaxLength(256)] public string ShippingAddressLine1 { get; set; } = "";
     [MaxLength(256)] public string ShippingAddressLine2 { get; set; } = "";

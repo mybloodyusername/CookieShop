@@ -185,7 +185,7 @@ public static class PersianDemoData
             var order = new Order
             {
                 Id = Guid.NewGuid(), OrderNumber = OrderNumberGenerator.Generate(created),
-                UserId = ownerId, Address = address, Status = draft.Status, Note = draft.Note,
+                UserId = ownerId, AddressId = address.Id, Status = draft.Status, Note = draft.Note,
                 ShippingTitle = address.Title, ShippingAddressLine1 = address.AddressLine1,
                 ShippingAddressLine2 = address.AddressLine2, ShippingPhoneNumber = address.PhoneNumber,
                 CreatedAt = created, UpdatedAt = draft.Status == OrderStatus.Pending ? created : created.AddHours(2)
