@@ -34,6 +34,12 @@ namespace CookieShop.Api.Controllers
         }
 
         [AllowAnonymous, EnableRateLimiting("auth"), HttpPost]
+        public async Task<ActionResult<UserResponse>> Refresh()
+        {
+            return await authService.Refresh();
+        }
+
+        [AllowAnonymous, EnableRateLimiting("auth"), HttpPost]
         public async Task<ActionResult<RegisterResponse>> Register([FromBody] RegisterRequest request)
         {
             return await authService.Register(request);
