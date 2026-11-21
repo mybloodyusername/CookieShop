@@ -6,5 +6,4 @@ public class CustomerPaymentTerms
     public int? MonthlyDueDay { get; set; }
     /// <summary>Zero disables monthly billing; null is unlimited; positive values cap monthly exposure.</summary>
     public decimal? MonthlySpendingLimit { get; set; } = 0;
-    public DateTimeOffset? DueAt { get; set; }
 }

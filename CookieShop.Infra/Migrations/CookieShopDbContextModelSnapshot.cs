@@ -227,9 +227,6 @@ namespace CookieShop.Infra.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("DueAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int?>("MonthlyDueDay")
                         .HasColumnType("integer");
 

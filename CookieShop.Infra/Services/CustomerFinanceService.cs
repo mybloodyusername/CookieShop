@@ -6,6 +6,7 @@ using CookieShop.Domain.Enums;
 using CookieShop.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 namespace CookieShop.Infra.Services;
 public class CustomerFinanceService(CookieShopDbContext context)
 {
@@ -41,15 +42,21 @@ public class CustomerFinanceService(CookieShopDbContext context)
     public async Task<DateTimeOffset?> ChargeDueAt(Guid userId)
     {
         var terms = await context.CustomerPaymentTerms.AsNoTracking().SingleOrDefaultAsync(x => x.UserId == userId);
-        var due = terms?.DueAt;
-        if (terms?.MonthlyDueDay is {} day)
+        if (terms?.MonthlyDueDay is not { } day) return null;
+        var calendar = new PersianCalendar();
+        var now = DateTime.UtcNow;
+        var year = calendar.GetYear(now);
+        var month = calendar.GetMonth(now);
+        var dayThisMonth = Math.Min(day, calendar.GetDaysInMonth(year, month));
+        var dueDate = calendar.ToDateTime(year, month, dayThisMonth, 0, 0, 0, 0);
+        if (dueDate <= now)
         {
-            var now = DateTimeOffset.UtcNow;
-            var monthly = new DateTimeOffset(now.Year, now.Month, day, 0, 0, 0, TimeSpan.Zero);
-            if (monthly <= now) monthly = monthly.AddMonths(1);
-            if (due is null || monthly < due) due = monthly;
+            month++;
+            if (month > calendar.GetMonthsInYear(year)) { month = 1; year++; }
+            var dayNextMonth = Math.Min(day, calendar.GetDaysInMonth(year, month));
+            dueDate = calendar.ToDateTime(year, month, dayNextMonth, 0, 0, 0, 0);
         }
-        return due;
+        return new DateTimeOffset(DateTime.SpecifyKind(dueDate, DateTimeKind.Utc));
     }
     public async Task EnsureCanOrder(Guid userId, decimal additionalExposure, CancellationToken ct = default)
     {
@@ -89,7 +96,7 @@ public class CustomerFinanceService(CookieShopDbContext context)
 
     public async Task<AccountResponse> SetTerms(Guid userId, PaymentTermsRequest request, CancellationToken ct)
     {
-        if (request.MonthlyDueDay is < 1 or > 28) throw new ValidationException("Monthly due day must be between 1 and 28 (Gregorian UTC).");
+        if (request.MonthlyDueDay is < 1 or > 31) throw new ValidationException("Monthly due day must be between 1 and 31.");
         if (request.MonthlySpendingLimit is {} limit && (!StoreCurrency.IsValid(limit) || limit < 0))
             throw new ValidationException("Monthly spending limit must be zero, unlimited, or a supported positive whole-toman amount.");
         await using var tx = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
@@ -98,7 +105,6 @@ public class CustomerFinanceService(CookieShopDbContext context)
         if (terms is null) { terms = new() { UserId = userId }; context.CustomerPaymentTerms.Add(terms); }
         terms.MonthlyDueDay = request.MonthlyDueDay;
         terms.MonthlySpendingLimit = request.MonthlySpendingLimit;
-        terms.DueAt = request.DueAt?.ToUniversalTime();
         await context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return await GetAccount(userId, ct);

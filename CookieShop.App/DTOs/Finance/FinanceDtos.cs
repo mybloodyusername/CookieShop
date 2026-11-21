@@ -1,9 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 namespace CookieShop.App.DTOs.Finance;
 
-/// <summary>Customer payment terms. Calendar deadlines are supplied as UTC instants.</summary>
 /// <summary>Monthly-account terms. A zero limit disables billing, a positive limit caps it, and null is unlimited.</summary>
-public sealed record PaymentTermsRequest(decimal? MonthlySpendingLimit = 0, DateTimeOffset? DueAt = null, int? MonthlyDueDay = null);
+/// <param name="MonthlyDueDay">Persian calendar day of month when monthly charges are due; short months use their last day.</param>
+public sealed record PaymentTermsRequest(decimal? MonthlySpendingLimit = 0, int? MonthlyDueDay = null);
 /// <summary>An explicit amount of a receipt allocated to one selected order.</summary>
 public sealed record PaymentAllocationRequest(Guid OrderId, decimal Amount);
 /// <summary>Money received outside the gateway. Unallocated funds remain wallet credit.</summary>
