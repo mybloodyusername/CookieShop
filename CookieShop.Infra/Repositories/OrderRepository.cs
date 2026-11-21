@@ -244,7 +244,13 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             var outstanding = order.TotalAmount - order.PaidAmount;
             if (outstanding > 0)
             {
-                if (!order.MonthlyBilling) throw new ConflictException("Payment is required before accepting this order.");
+                // Use the customer's current terms: they may have been granted monthly billing
+                // after this order was placed. The pending exposure is still checked below.
+                var monthlyBillingEnabled = await context.CustomerPaymentTerms
+                    .AnyAsync(x => x.UserId == order.UserId &&
+                        (x.MonthlySpendingLimit == null || x.MonthlySpendingLimit > 0));
+                if (!monthlyBillingEnabled) throw new ConflictException("Payment is required before accepting this order.");
+                order.MonthlyBilling = true;
                 var reserved = await context.Orders.Where(x => x.UserId == order.UserId && x.Id != order.Id && x.MonthlyBilling && x.Status == OrderStatus.Pending)
                     .SumAsync(x => (decimal?)(x.TotalAmount - x.PaidAmount)) ?? 0;
                 await finance.EnsureCanOrder(order.UserId, reserved + outstanding);
