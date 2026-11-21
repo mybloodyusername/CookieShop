@@ -29,7 +29,9 @@ public static class PersianDemoData
             if (adminIds.Length == 0)
                 throw new InvalidOperationException("No existing administrator found. Provision an owner before resetting sample data.");
             var admins = await db.Users.AsNoTracking().Where(x => adminIds.Contains(x.Id))
-                .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToListAsync(cancellationToken);
+                .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id)
+                .Select(x => new { x.Id, x.CreatedAt, x.PhoneNumber, x.UserName, x.FirstName, x.LastName })
+                .ToListAsync(cancellationToken);
             var owner = admins[0];
             if (string.IsNullOrWhiteSpace(owner.PhoneNumber))
                 throw new InvalidOperationException("The administrator needs a phone number for sample delivery addresses.");
@@ -42,8 +44,10 @@ public static class PersianDemoData
                 x => new Category { Id = Guid.NewGuid(), Name = x });
             var products = PersianSampleCatalog.Create(categories, now);
             var images = PrepareImages(products, now);
-            var customer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "demo-customer", PhoneNumber = "09120000001", Email = "demo-customer@example.invalid" };
+            var customer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "09120000001", PhoneNumber = "09120000001", Email = "customer1@example.invalid", FirstName = "مشتری", LastName = "اول" };
+            var secondCustomer = new ApplicationUser { Id = Guid.NewGuid(), UserName = "09120000002", PhoneNumber = "09120000002", Email = "customer2@example.invalid", FirstName = "مشتری", LastName = "دوم" };
             var addresses = CreateAddresses(customer);
+            var secondCustomerAddresses = CreateAddresses(secondCustomer);
             var orders = CreateOrders(customer.Id, addresses, products, now);
             var cart = new Cart
             {
@@ -52,7 +56,7 @@ public static class PersianDemoData
                 {
                     new() { Id = Guid.NewGuid(), Product = products[1], Quantity = 2 },
                     new() { Id = Guid.NewGuid(), Product = products[9], Quantity = 1 },
-                    new() { Id = Guid.NewGuid(), Product = products[20], Quantity = 1 }
+                    new() { Id = Guid.NewGuid(), Product = products[16], Quantity = 1 }
                 }
             };
 
@@ -85,14 +89,20 @@ public static class PersianDemoData
             await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
             {
                 var users = services.GetRequiredService<UserManager<ApplicationUser>>();
-                var created = await users.CreateAsync(customer, Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) + "Aa1!");
-                if (!created.Succeeded) throw new InvalidOperationException(string.Join("; ", created.Errors.Select(x => x.Description)));
-                var assigned = await users.AddToRoleAsync(customer, UserRole.Customer);
-                if (!assigned.Succeeded) throw new InvalidOperationException("Could not assign sample customer role.");
+                var passwordHasher = services.GetRequiredService<IPasswordHasher<ApplicationUser>>();
+                foreach (var sampleCustomer in new[] { customer, secondCustomer })
+                {
+                    // These fixed development accounts intentionally use the requested sample password.
+                    sampleCustomer.PasswordHash = passwordHasher.HashPassword(sampleCustomer, "User@123");
+                    var created = await users.CreateAsync(sampleCustomer);
+                    if (!created.Succeeded) throw new InvalidOperationException(string.Join("; ", created.Errors.Select(x => x.Description)));
+                    var assigned = await users.AddToRoleAsync(sampleCustomer, UserRole.Customer);
+                    if (!assigned.Succeeded) throw new InvalidOperationException("Could not assign sample customer role.");
+                }
                 db.Categories.AddRange(categories.Values);
                 db.Products.AddRange(products);
                 db.MediaImages.AddRange(images.Select(x => x.Image));
-                db.Addresses.AddRange(addresses);
+                db.Addresses.AddRange(addresses.Concat(secondCustomerAddresses));
                 db.Orders.AddRange(orders);
                 foreach (var order in orders.Where(x => x.PaidAmount > 0))
                 {
@@ -114,8 +124,8 @@ public static class PersianDemoData
                 await transaction.CommitAsync(cancellationToken);
             }
             logger.LogInformation(
-                "Persian sample setup complete: {Admins} admin(s) preserved, 1 sample customer, {Categories} categories, {Products} products, {Images} WebP images, {Addresses} addresses, {Orders} orders, 1 cart. All amounts are whole toman.",
-                admins.Count, categories.Count, products.Count, images.Count, addresses.Length, orders.Count);
+                "Persian sample setup complete: {Admins} admin(s) preserved, 2 sample customers, {Categories} categories, {Products} products, {Images} WebP images, {Addresses} addresses, {Orders} orders, 1 cart. All amounts are whole toman.",
+                admins.Count, categories.Count, products.Count, images.Count, addresses.Length + secondCustomerAddresses.Length, orders.Count);
         }
         finally
         {
@@ -166,17 +176,17 @@ public static class PersianDemoData
         OrderDraft[] drafts =
         [
             new(OrderStatus.Delivered, 24, 0, "سفارش نمونه تحویل‌شده؛ بسته‌ها سالم به دست گیرنده رسیدند.", [(0, 2), (1, 1), (4, 1)]),
-            new(OrderStatus.Delivered, 20, 1, "سفارش نمونه برای پذیرایی در محل کار؛ تحویل در ساعت اداری.", [(20, 2), (17, 1)]),
-            new(OrderStatus.Delivered, 16, 2, "هدیه نمونه تولد؛ بسته‌بندی هدیه و کارت تبریک همراه سفارش.", [(21, 1), (9, 2)]),
-            new(OrderStatus.Shipped, 8, 0, "سفارش نمونه ارسال‌شده؛ بسته در مسیر تحویل است.", [(8, 2), (12, 1), (15, 1)]),
-            new(OrderStatus.Shipped, 6, 2, "بسته هدیه نمونه؛ لطفاً پیش از تحویل با گیرنده هماهنگ شود.", [(22, 1), (5, 1)]),
-            new(OrderStatus.Accepted, 4, 1, "سفارش نمونه با وضعیت پرداخت‌شده؛ در انتظار آماده‌سازی برای ارسال.", [(23, 1), (4, 2)]),
+            new(OrderStatus.Delivered, 20, 1, "سفارش نمونه برای پذیرایی در محل کار؛ تحویل در ساعت اداری.", [(14, 2), (16, 1)]),
+            new(OrderStatus.Delivered, 16, 2, "هدیه نمونه تولد؛ بسته‌بندی هدیه و کارت تبریک همراه سفارش.", [(15, 1), (9, 2)]),
+            new(OrderStatus.Shipped, 8, 0, "سفارش نمونه ارسال‌شده؛ بسته در مسیر تحویل است.", [(8, 2), (12, 1), (5, 1)]),
+            new(OrderStatus.Shipped, 6, 2, "بسته هدیه نمونه؛ لطفاً پیش از تحویل با گیرنده هماهنگ شود.", [(3, 1), (11, 1)]),
+            new(OrderStatus.Accepted, 4, 1, "سفارش نمونه با وضعیت پرداخت‌شده؛ در انتظار آماده‌سازی برای ارسال.", [(13, 1), (4, 2)]),
             new(OrderStatus.Accepted, 3, 0, "سفارش نمونه با پرداخت نمایشی؛ لطفاً طعم‌ها جداگانه بسته‌بندی شوند.", [(6, 1), (10, 1), (13, 2)]),
             new(OrderStatus.Pending, 2, 0, "سفارش نمونه در انتظار پرداخت؛ موجودی اقلام رزرو شده است.", [(1, 2), (9, 1)]),
-            new(OrderStatus.Pending, 1, 1, "سفارش نمونه دورهمی؛ در انتظار تکمیل پرداخت.", [(20, 1), (2, 1), (11, 1)]),
-            new(OrderStatus.Pending, 0, 2, "سفارش نمونه هدیه؛ در انتظار پرداخت و تأیید نهایی.", [(22, 1), (16, 1)]),
+            new(OrderStatus.Pending, 1, 1, "سفارش نمونه دورهمی؛ در انتظار تکمیل پرداخت.", [(14, 1), (2, 1), (11, 1)]),
+            new(OrderStatus.Pending, 0, 2, "سفارش نمونه هدیه؛ در انتظار پرداخت و تأیید نهایی.", [(3, 1), (16, 1)]),
             new(OrderStatus.Cancelled, 12, 0, "سفارش نمونه لغوشده به درخواست خریدار؛ موجودی اقلام آزاد شده است.", [(3, 2), (14, 1)]),
-            new(OrderStatus.Cancelled, 5, 1, "سفارش نمونه لغوشده؛ پرداخت تکمیل نشد و موجودی رزرو نیست.", [(7, 1), (17, 1), (21, 1)])
+            new(OrderStatus.Cancelled, 5, 1, "سفارش نمونه لغوشده؛ پرداخت تکمیل نشد و موجودی رزرو نیست.", [(7, 1), (15, 1), (8, 1)])
         ];
         return drafts.Select(draft =>
         {

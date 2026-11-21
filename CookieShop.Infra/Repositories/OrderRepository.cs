@@ -97,7 +97,7 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
             if (product is null)
                 throw new ConflictException("A product in your cart is no longer available.");
 
-            if (!product.IsAvailable)
+            if (product.IsDeleted || !product.IsAvailable)
                 throw new ConflictException($"Product \"{product.Name}\" is not available.");
 
             if (product.StockQuantity < item.Quantity)

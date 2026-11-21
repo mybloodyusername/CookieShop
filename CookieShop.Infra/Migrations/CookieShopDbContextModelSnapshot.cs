@@ -86,6 +86,9 @@ namespace CookieShop.Infra.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -202,6 +205,9 @@ namespace CookieShop.Infra.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -683,6 +689,9 @@ namespace CookieShop.Infra.Migrations
                         .HasColumnType("character varying(512)");
 
                     b.Property<bool>("IsAvailable")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsOnSale")

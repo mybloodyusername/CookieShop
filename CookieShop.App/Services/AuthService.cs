@@ -29,7 +29,7 @@ public class AuthService(
     public async Task<UserResponse> Login(LoginRequest request)
     {
         var user = await userRepository.GetByPhoneNumber(request.PhoneNumber);
-        if (user == null) throw new InvalidCredentialException("Invalid phone number or password.");
+        if (user == null || user.IsDeleted) throw new InvalidCredentialException("Invalid phone number or password.");
 
         var result = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
         if (!result.Succeeded)

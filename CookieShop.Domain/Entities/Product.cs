@@ -22,6 +22,7 @@ public class Product
     public int StockQuantity { get; set; }
 
     public bool IsAvailable { get; set; } = true;
+    public bool IsDeleted { get; set; }
 
     public Guid CategoryId { get; set; }
     public Category Category { get; set; } = null!;

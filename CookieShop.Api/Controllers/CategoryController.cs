@@ -12,9 +12,10 @@ namespace CookieShop.Api.Controllers
     {
         [AllowAnonymous]
         [HttpGet]
-        public async Task<ActionResult<IReadOnlyCollection<CategoryResponse>>> GetAll()
+        public async Task<ActionResult<IReadOnlyCollection<CategoryResponse>>> GetAll([FromQuery] bool isDeleted = false)
         {
-            var result = await categoryService.GetAll();
+            if (isDeleted && !User.IsInRole(UserRole.Admin)) isDeleted = false;
+            var result = await categoryService.GetAll(isDeleted);
             return Ok(result);
         }
 
@@ -40,6 +41,13 @@ namespace CookieShop.Api.Controllers
         {
             var result = await categoryService.Delete(id);
             return Ok(new { success = result });
+        }
+
+        [Authorize(Roles = UserRole.Admin)]
+        [HttpPut("SetDeletedByAdmin/{id}")]
+        public async Task<ActionResult> SetDeletedByAdmin(Guid id, [FromQuery] bool isDeleted)
+        {
+            return Ok(new { success = await categoryService.SetDeleted(id, isDeleted) });
         }
     }
 }

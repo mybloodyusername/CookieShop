@@ -1,3 +1,3 @@
 namespace CookieShop.App.DTOs.Category;
 
-public record CategoryResponse(Guid Id, string Name);
+public record CategoryResponse(Guid Id, string Name, bool IsDeleted, int ProductCount);

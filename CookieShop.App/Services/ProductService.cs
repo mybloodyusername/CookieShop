@@ -14,20 +14,20 @@ namespace CookieShop.App.Services;
 
 public class ProductService(IProductRepository productRepository, ILogger<ProductService> logger, MediaUrlProvider urls)
 {
-    public async Task<ProductDetailResponse> GetById(Guid id)
+    public async Task<ProductDetailResponse> GetById(Guid id, bool includeDeleted = false)
     {
-        var result = await productRepository.GetById(id);
+        var result = await productRepository.GetById(id, includeDeleted);
         if (result is null) throw new NotFoundException("Product not found");
         var response = result.Adapt<ProductDetailResponse>();
         return response with { Images = Images(result), ImageUrl = Images(result).FirstOrDefault()?.Url ?? result.ImageUrl };
     }
 
-    public async Task<PagedResult<ProductResponse>> GetAll(Guid? categoryId, string? search, int page, int pageSize)
+    public async Task<PagedResult<ProductResponse>> GetAll(Guid? categoryId, string? search, bool isDeleted, bool includeUnavailable, int page, int pageSize)
     {
         page = page < 1 ? 1 : page;
         pageSize = pageSize is < 1 or > 100 ? 10 : pageSize;
 
-        var result = await productRepository.GetFiltered(categoryId, search, page, pageSize);
+        var result = await productRepository.GetFiltered(categoryId, search, isDeleted, includeUnavailable, page, pageSize);
         return new PagedResult<ProductResponse>(
             result.Items.Select(x => x.Adapt<ProductResponse>() with { Images = Images(x), ImageUrl = Images(x).FirstOrDefault()?.Url ?? x.ImageUrl }).ToList(),
             result.TotalCount,
@@ -77,6 +77,20 @@ public class ProductService(IProductRepository productRepository, ILogger<Produc
         catch (DbUpdateException e)
         {
             logger.LogError(e, "Failed to delete product with {ProductId}", id);
+            throw new ConflictException("Product cannot be deleted because orders reference it.");
+        }
+    }
+
+    public async Task<bool> SetDeleted(Guid id, bool isDeleted)
+    {
+        try
+        {
+            if (!await productRepository.SetDeleted(id, isDeleted)) throw new NotFoundException("Product not found.");
+            return true;
+        }
+        catch (DbUpdateException e)
+        {
+            logger.LogError(e, "Failed to change deletion state for product {ProductId}", id);
             throw new ConflictException("Product cannot be deleted because orders reference it.");
         }
     }

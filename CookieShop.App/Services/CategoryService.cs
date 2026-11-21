@@ -9,10 +9,10 @@ namespace CookieShop.App.Services;
 
 public class CategoryService(ICategoryRepository categoryRepository, ILogger<CategoryService> logger)
 {
-    public async Task<IReadOnlyCollection<CategoryResponse>> GetAll()
+    public async Task<IReadOnlyCollection<CategoryResponse>> GetAll(bool isDeleted = false)
     {
-        var result = await categoryRepository.GetAll();
-        return result.Adapt<IReadOnlyCollection<CategoryResponse>>();
+        var result = await categoryRepository.GetAll(isDeleted);
+        return result.Select(category => new CategoryResponse(category.Id, category.Name, category.IsDeleted, category.Products.Count)).ToList();
     }
 
     public async Task<CategoryResponse> Create(CreateCategoryRequest request)
@@ -20,7 +20,7 @@ public class CategoryService(ICategoryRepository categoryRepository, ILogger<Cat
         try
         {
             var result = await categoryRepository.Create(request);
-            return result.Adapt<CategoryResponse>();
+            return new CategoryResponse(result.Id, result.Name, result.IsDeleted, 0);
         }
         catch (DbUpdateException e)
         {
@@ -35,7 +35,7 @@ public class CategoryService(ICategoryRepository categoryRepository, ILogger<Cat
         {
             var result = await categoryRepository.Update(request);
             if (result is null) throw new NotFoundException("Category not found");
-            return result.Adapt<CategoryResponse>();
+            return new CategoryResponse(result.Id, result.Name, result.IsDeleted, await categoryRepository.HasProducts(result.Id) ? 1 : 0);
         }
         catch (DbUpdateException e)
         {
@@ -58,4 +58,19 @@ public class CategoryService(ICategoryRepository categoryRepository, ILogger<Cat
             throw new ConflictException("Category cannot be deleted because products reference it.");
         }
     }
+
+    public async Task<bool> SetDeleted(Guid id, bool isDeleted)
+    {
+        try
+        {
+            if (!await categoryRepository.SetDeleted(id, isDeleted)) throw new NotFoundException("Category not found.");
+            return true;
+        }
+        catch (DbUpdateException e)
+        {
+            logger.LogError(e, "Failed to change deletion state for category {CategoryId}", id);
+            throw new ConflictException("Category cannot be deleted because products reference it.");
+        }
+    }
+
 }

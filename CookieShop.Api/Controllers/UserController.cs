@@ -86,9 +86,16 @@ namespace CookieShop.Api.Controllers
 
         [Authorize(Roles = UserRole.Admin)]
         [HttpGet("GetAllByAdmin")]
-        public async Task<ActionResult> GetAll(int page = 1, int pageSize = 30)
+        public async Task<ActionResult> GetAll(int page = 1, int pageSize = 30, [FromQuery] bool isDeleted = false)
         {
-            return Ok(await userService.GetAll(page, pageSize));
+            return Ok(await userService.GetAll(page, pageSize, isDeleted));
+        }
+
+        [Authorize(Roles = UserRole.Admin)]
+        [HttpPut("SetDeletedByAdmin/{id}")]
+        public async Task<ActionResult> SetDeletedByAdmin(Guid id, [FromQuery] bool isDeleted)
+        {
+            return Ok(new { success = await userService.SetDeleted(id, isDeleted, User.GetUserId()) });
         }
     }
 }

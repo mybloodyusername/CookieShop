@@ -18,15 +18,36 @@ public class UserService(IUserRepository userRepository, UserManager<Application
     public async Task<bool> IsEmailAvailable(string email) =>
         await userManager.FindByEmailAsync(email) == null;
 
-    public async Task<PagedResult<UserResponse>> GetAll(int page, int pageSize)
+    public async Task<PagedResult<UserResponse>> GetAll(int page, int pageSize, bool isDeleted = false)
     {
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
-        var query = userManager.Users.AsNoTracking();
+        var query = userManager.Users.AsNoTracking().Where(user => user.IsDeleted == isDeleted);
         var total = await query.CountAsync();
         var users = await query.OrderBy(x => x.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
         var roles = await userRepository.GetRoles(users.Select(x => x.Id).ToArray());
         var responses = users.Select(x => x.Adapt<UserResponse>() with { Role = roles.GetValueOrDefault(x.Id) }).ToList();
         return new(responses, total, page, pageSize);
+    }
+
+    public async Task<bool> SetDeleted(Guid id, bool isDeleted, Guid actorId)
+    {
+        var user = await userManager.FindByIdAsync(id.ToString());
+        if (user is null) throw new NotFoundException("User not found.");
+        if (actorId == id && isDeleted) throw new ConflictException("You cannot delete your own account.");
+        var roles = await userManager.GetRolesAsync(user);
+        if (isDeleted && roles.Contains(UserRole.Admin))
+        {
+            var activeAdmins = await userManager.GetUsersInRoleAsync(UserRole.Admin);
+            if (activeAdmins.Count(candidate => !candidate.IsDeleted) <= 1)
+                throw new ConflictException("The last active administrator cannot be deleted.");
+        }
+        user.IsDeleted = isDeleted;
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        user.SecurityStamp = Guid.NewGuid().ToString();
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            throw new System.ComponentModel.DataAnnotations.ValidationException(string.Join("; ", result.Errors.Select(error => error.Description)));
+        return true;
     }
 
     public async Task<UserResponse> GetById(Guid id)
@@ -71,7 +92,7 @@ public class UserService(IUserRepository userRepository, UserManager<Application
     public async Task<UserResponse> Me(Guid id)
     {
         var result = await userRepository.GetById(id);
-        return result == null ? throw new NotFoundException("User not found") : await ToResponse(result);
+        return result == null || result.IsDeleted ? throw new NotFoundException("User not found") : await ToResponse(result);
     }
     private async Task<UserResponse> ToResponse(ApplicationUser user)
     {

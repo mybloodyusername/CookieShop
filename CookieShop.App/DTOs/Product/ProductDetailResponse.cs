@@ -15,7 +15,8 @@ public record ProductDetailResponse(
     Guid CategoryId,
     CategoryResponse Category,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt
+    DateTimeOffset UpdatedAt,
+    bool IsDeleted
 )
 {
     public string Currency => CookieShop.Domain.Constants.StoreCurrency.Code;

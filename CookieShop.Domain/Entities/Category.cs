@@ -7,6 +7,7 @@ public class Category
     public Guid Id { get; set; }
 
     [Required, MaxLength(64)] public required string Name { get; set; }
+    public bool IsDeleted { get; set; }
 
     public ICollection<Product> Products { get; set; } = new List<Product>();
 }

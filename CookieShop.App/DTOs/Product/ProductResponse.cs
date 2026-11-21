@@ -10,7 +10,8 @@ public record ProductResponse(
     string ImageUrl,
     int StockQuantity,
     bool IsAvailable,
-    Guid CategoryId
+    Guid CategoryId,
+    bool IsDeleted
 )
 {
     public string Currency => CookieShop.Domain.Constants.StoreCurrency.Code;

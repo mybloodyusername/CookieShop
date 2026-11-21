@@ -9,17 +9,20 @@ namespace CookieShop.Infra.Repositories;
 
 public class ProductRepository(CookieShopDbContext context) : IProductRepository
 {
-    public async Task<Product?> GetById(Guid id)
+    public async Task<Product?> GetById(Guid id, bool includeDeleted = false)
     {
-        return await context.Products.AsNoTracking()
+        var query = context.Products.AsNoTracking();
+        if (!includeDeleted) query = query.Where(product => !product.IsDeleted);
+        return await query
             .Include(p => p.Category)
             .Include(p => p.Images).ThenInclude(x => x.Image)
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
-    public async Task<PagedResult<Product>> GetFiltered(Guid? categoryId, string? search, int page, int pageSize)
+    public async Task<PagedResult<Product>> GetFiltered(Guid? categoryId, string? search, bool isDeleted, bool includeUnavailable, int page, int pageSize)
     {
-        var query = context.Products.AsNoTracking().Include(p => p.Images).ThenInclude(x => x.Image).Where(p => p.IsAvailable);
+        var query = context.Products.AsNoTracking().Include(p => p.Images).ThenInclude(x => x.Image)
+            .Where(product => product.IsDeleted == isDeleted && (includeUnavailable || product.IsAvailable));
 
         if (categoryId.HasValue)
             query = query.Where(p => p.CategoryId == categoryId.Value);
@@ -41,6 +44,8 @@ public class ProductRepository(CookieShopDbContext context) : IProductRepository
 
     public async Task<Product> Create(CreateProductRequest request)
     {
+        if (!await context.Categories.AnyAsync(category => category.Id == request.CategoryId && !category.IsDeleted))
+            throw new CookieShop.App.Exceptions.ConflictException("The selected category is unavailable.");
         var result = await context.Products.AddAsync(new Product
         {
             Name = request.Name,
@@ -60,7 +65,9 @@ public class ProductRepository(CookieShopDbContext context) : IProductRepository
     public async Task<Product?> Update(UpdateProductRequest request)
     {
         var product = await context.Products.FirstOrDefaultAsync(p => p.Id == request.Id);
-        if (product is null) return null;
+        if (product is null || product.IsDeleted) return null;
+        if (!await context.Categories.AnyAsync(category => category.Id == request.CategoryId && !category.IsDeleted))
+            throw new CookieShop.App.Exceptions.ConflictException("The selected category is unavailable.");
 
         product.Name = request.Name;
         product.Description = request.Description;
@@ -79,10 +86,24 @@ public class ProductRepository(CookieShopDbContext context) : IProductRepository
 
     public async Task<bool> Delete(Guid id)
     {
+        var product = await context.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+        if (product is null) return false;
+        product.IsDeleted = true;
+        product.UpdatedAt = DateTimeOffset.UtcNow;
+        await context.CartItems.Where(item => item.ProductId == id).ExecuteDeleteAsync();
+        await context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> SetDeleted(Guid id, bool isDeleted)
+    {
         var product = await context.Products.FirstOrDefaultAsync(p => p.Id == id);
         if (product is null) return false;
-
-        context.Products.Remove(product);
+        if (!isDeleted && await context.Categories.AnyAsync(category => category.Id == product.CategoryId && category.IsDeleted))
+            throw new CookieShop.App.Exceptions.ConflictException("A product in a deleted category cannot be restored.");
+        product.IsDeleted = isDeleted;
+        product.UpdatedAt = DateTimeOffset.UtcNow;
+        if (isDeleted) await context.CartItems.Where(item => item.ProductId == id).ExecuteDeleteAsync();
         await context.SaveChangesAsync();
         return true;
     }

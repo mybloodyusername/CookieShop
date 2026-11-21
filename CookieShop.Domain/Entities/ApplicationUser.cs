@@ -13,6 +13,7 @@ public class ApplicationUser : IdentityUser<Guid>
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public bool IsDeleted { get; set; }
     
     public ICollection<Address> Addresses { get; set; } = new List<Address>();
 }
