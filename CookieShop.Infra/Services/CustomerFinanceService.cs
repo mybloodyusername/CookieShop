@@ -109,26 +109,31 @@ public class CustomerFinanceService(CookieShopDbContext context)
         await tx.CommitAsync(ct);
         return await GetAccount(userId, ct);
     }
-    private static void ValidateReceipt(decimal amount, string reference, string method, string description, DateTimeOffset? occurredAt)
+    private static void ValidateReceipt(decimal amount, string? reference, string method, string description, DateTimeOffset? occurredAt, bool requireReference = true)
     {
-        if (!StoreCurrency.IsValid(amount) || amount == 0 || string.IsNullOrWhiteSpace(reference) || reference.Length > 128 ||
+        if (!StoreCurrency.IsValid(amount) || amount == 0 || (requireReference && string.IsNullOrWhiteSpace(reference)) || (reference?.Length ?? 0) > 128 ||
             string.IsNullOrWhiteSpace(method) || method.Length > 32 || string.IsNullOrWhiteSpace(description) || description.Length > 1024)
-            throw new ValidationException("A positive whole-toman amount, reference (128), method (32), and description (1024) are required.");
+            throw new ValidationException(requireReference
+                ? "A positive whole-toman amount, reference (128), method (32), and description (1024) are required."
+                : "A positive whole-toman amount, method (32), and description (1024) are required; an optional reference cannot exceed 128 characters.");
         if (occurredAt > DateTimeOffset.UtcNow.AddMinutes(1))
             throw new ValidationException("Payment/refund occurrence cannot be in the future.");
     }
 
     public async Task<FinancialEntryResponse> RecordPayment(Guid userId, Guid adminId, RecordPaymentRequest request, CancellationToken ct)
     {
-        ValidateReceipt(request.Amount, request.Reference, request.Method, request.Description, request.OccurredAt);
+        if (request.Method is not ("PAYA" or "CARD")) throw new ValidationException("Payment method must be PAYA or CARD.");
+        ValidateReceipt(request.Amount, request.Reference, request.Method, request.Description, request.OccurredAt, requireReference: false);
         var allocations = request.Allocations?.ToList() ?? [];
         if (allocations.Count > 500 || allocations.Any(a => a.OrderId == Guid.Empty || !StoreCurrency.IsValid(a.Amount) || a.Amount == 0) ||
-            allocations.Select(a => a.OrderId).Distinct().Count() != allocations.Count || allocations.Sum(a => a.Amount) > request.Amount)
-            throw new ValidationException("Select distinct orders with positive whole-toman allocations totaling no more than the receipt amount (maximum 500 orders).");
+            allocations.Select(a => a.OrderId).Distinct().Count() != allocations.Count)
+            throw new ValidationException("Select distinct orders with positive whole-toman allocations (maximum 500 orders).");
         await using var tx = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         await EnsureCustomer(userId, ct);
-        var reference = request.Reference.Trim();
-        var existing = await context.FinancialEntries.SingleOrDefaultAsync(x => x.UserId == userId && x.Reference == reference, ct);
+        var reference = request.Reference?.Trim() ?? string.Empty;
+        FinancialEntry? existing = null;
+        if (reference.Length > 0)
+            existing = await context.FinancialEntries.SingleOrDefaultAsync(x => x.UserId == userId && x.Reference == reference, ct);
         if (existing is not null)
         {
             var saved = await context.OrderPayments.Where(x => x.FinancialEntryId == existing.Id).ToListAsync(ct);
@@ -138,6 +143,9 @@ public class CustomerFinanceService(CookieShopDbContext context)
         }
         else
         {
+            var account = await GetAccount(userId, ct);
+            if (allocations.Sum(a => a.Amount) > request.Amount + account.WalletBalance)
+                throw new ConflictException("Selected orders exceed the receipt amount and available wallet balance.");
             var ids = allocations.Select(a => a.OrderId).ToList();
             var orders = await context.Orders.Where(o => ids.Contains(o.Id) && o.UserId == userId).ToDictionaryAsync(o => o.Id, ct);
             if (orders.Count != ids.Count) throw new NotFoundException("A selected order does not belong to this customer.");
@@ -155,6 +163,8 @@ public class CustomerFinanceService(CookieShopDbContext context)
                 var order = orders[allocation.OrderId];
                 if (order.Status == OrderStatus.Pending)
                     context.FinancialEntries.Add(new() { UserId = userId, OrderId = order.Id, Amount = -allocation.Amount, Kind = "OrderPrepayment" });
+                else if (!order.MonthlyBilling)
+                    context.FinancialEntries.Add(new() { UserId = userId, OrderId = order.Id, Amount = -allocation.Amount, Kind = "WalletDebit" });
                 Allocate(order, allocation.Amount, existing, "Manual");
             }
             await context.SaveChangesAsync(ct);

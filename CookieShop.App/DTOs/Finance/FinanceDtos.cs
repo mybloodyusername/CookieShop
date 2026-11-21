@@ -6,8 +6,8 @@ namespace CookieShop.App.DTOs.Finance;
 public sealed record PaymentTermsRequest(decimal? MonthlySpendingLimit = 0, int? MonthlyDueDay = null);
 /// <summary>An explicit amount of a receipt allocated to one selected order.</summary>
 public sealed record PaymentAllocationRequest(Guid OrderId, decimal Amount);
-/// <summary>Money received outside the gateway. Unallocated funds remain wallet credit.</summary>
-public sealed record RecordPaymentRequest(decimal Amount, [Required, MaxLength(128)] string Reference,
+/// <summary>Manually recorded receipt. Unallocated funds remain wallet credit, and selected-order shortfalls use wallet funds.</summary>
+public sealed record RecordPaymentRequest(decimal Amount, [MaxLength(128)] string? Reference,
     [Required, MaxLength(32)] string Method, [Required, MaxLength(1024)] string Description,
     IReadOnlyCollection<PaymentAllocationRequest>? Allocations = null, DateTimeOffset? OccurredAt = null);
 /// <summary>Money already returned externally to a customer, optionally against a paid order.</summary>
