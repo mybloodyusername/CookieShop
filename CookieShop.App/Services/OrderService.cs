@@ -109,7 +109,11 @@ public class OrderService(
         if (!allowed)
             throw new ConflictException($"Invalid status transition from {order.Status} to {newStatus}.");
 
-        var updated = await orderRepository.UpdateStatus(order.Id, newStatus, adminId, request.Reason)
+        var reason = request.Reason?.Trim();
+        if ((newStatus is OrderStatus.Cancelled or OrderStatus.Rejected) && string.IsNullOrWhiteSpace(reason))
+            reason = "تغییر وضعیت توسط مدیر";
+
+        var updated = await orderRepository.UpdateStatus(order.Id, newStatus, adminId, reason)
                       ?? throw new NotFoundException("Order not found");
         return ToResponse(updated);
     }

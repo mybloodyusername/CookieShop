@@ -206,7 +206,7 @@ public class OrderRepository(CookieShopDbContext context, CustomerFinanceService
 
         // Reverse exactly what was charged: funded money for pending orders, full charge for accepted ones.
         var charged = -(await context.FinancialEntries.Where(x => x.OrderId == id &&
-            (x.Kind == "MonthlyCharge" || x.Kind == "OrderPrepayment")).SumAsync(x => (decimal?)x.Amount) ?? 0);
+            (x.Kind == "MonthlyCharge" || x.Kind == "OrderPrepayment" || x.Kind == "WalletDebit")).SumAsync(x => (decimal?)x.Amount) ?? 0);
         charged -= order.RefundedAmount;
         if (charged > 0)
         {
